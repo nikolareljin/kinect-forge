@@ -3,6 +3,15 @@
 Kinect Forge is a modular 3D scanning toolkit for Ubuntu that uses Kinect depth cameras to build clean 3D models
 from small objects first, then scales to larger scenes later.
 
+## Why resurrect a Kinect?
+You already own a solid depth camera. Instead of letting it gather dust, turn it into a practical 3D scanner for:
+- Rebuilding broken parts by capturing exact dimensions.
+- Rapid prototyping and fit checks without expensive scanners.
+- Learning 3D scanning workflows (capture → reconstruction → measurement) on a budget.
+- Expanding later to larger objects once your pipeline is tuned.
+
+Kinect Forge makes this smooth with turntable capture, auto-stop, cleanup, and export to common formats like GLB/OBJ.
+
 ## Why this stack
 - **Python** for rapid iteration and maintainability.
 - **Open3D** for RGB-D integration and mesh extraction.
