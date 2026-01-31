@@ -78,6 +78,10 @@ Cross-platform GUI: Tkinter works on Linux/Windows/macOS, but Kinect v1 capture 
 - `docs/TROUBLESHOOTING.md`
 - `docs/PACKAGING.md`
 
+## CI
+- `.github/workflows/ci.yml` (tests + lint via ci-helpers)
+- `.github/workflows/package.yml` (package builds via ci-helpers)
+
 Background masking (small objects):
 ```bash
 python -m kinect_forge capture --output scans/part --frames 240 --depth-min 0.4 --depth-max 1.2

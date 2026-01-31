@@ -1,0 +1,21 @@
+name: Package
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    uses: nikolareljin/ci-helpers/.github/workflows/release-build.yml@production
+    with:
+      python_version: "3.12"
+      working_directory: "."
+      build_command: "./update && ./scripts/package.sh"
+      artifact_paths: "dist/**"
+      upload_artifact: true

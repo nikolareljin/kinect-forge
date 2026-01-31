@@ -31,3 +31,4 @@ pip install -e .[dev,packaging]
 - Packaging only bundles the GUI and offline tools. Kinect v1 capture is primarily supported on Linux.
 - If PyInstaller cannot find Tkinter, install your system's Tk packages.
 - For Open3D, PyInstaller may require extra hidden imports; see `scripts/pyinstaller.spec`.
+- CI packaging uses `ci-helpers` reusable workflows and builds Linux artifacts via `./scripts/package.sh`.
