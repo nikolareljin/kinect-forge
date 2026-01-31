@@ -12,6 +12,7 @@ Kinect Forge is a Python-based 3D scanning toolkit for Kinect depth cameras on U
 ## Common Commands
 ```bash
 ./update
+./setup
 python -m venv venv && source venv/bin/activate
 pip install -e .[dev]
 python -m kinect_forge --help

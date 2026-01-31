@@ -39,6 +39,7 @@ Refer to your distro's libfreenect package documentation for recommended rules.
 ## Python environment
 ```bash
 ./update
+./setup
 python -m venv venv && source venv/bin/activate
 pip install -e .[dev]
 ```

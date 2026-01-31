@@ -18,6 +18,7 @@ from small objects first, then scales to larger scenes later.
 ## Quick start
 ```bash
 ./update
+./setup
 python -m venv venv && source venv/bin/activate
 pip install -e .[dev]
 python -m kinect_forge --help
