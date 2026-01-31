@@ -26,6 +26,13 @@ GUI package (optional):
 sudo apt install python3-tk
 ```
 
+Recommended full install (Ubuntu):
+```bash
+sudo apt update
+sudo apt install -y libfreenect-dev python3-freenect python3-tk \
+  build-essential pkg-config cmake
+```
+
 If you want to access the Kinect without sudo, you may need udev rules for the device.
 Refer to your distro's libfreenect package documentation for recommended rules.
 
@@ -39,6 +46,39 @@ pip install -e .[dev]
 ## Verify hardware
 ```bash
 python -m kinect_forge status
+```
+
+## End-to-end test (CLI)
+Capture → preview → reconstruct → measure.
+```bash
+python -m kinect_forge capture --output scans/test --frames 180 --mode turntable --fps 5 \
+  --auto-stop --depth-min 0.4 --depth-max 1.2 --turntable-preset vxb-8
+
+python -m kinect_forge view --dataset scans/test --every 10
+
+python -m kinect_forge reconstruct --input-dir scans/test --output-mesh scans/test/model.glb \
+  --preset small --icp --smooth 8 --fill-hole-radius 0.01
+
+python -m kinect_forge measure --mesh scans/test/model.glb
+```
+
+## End-to-end test (GUI)
+```bash
+python -m kinect_forge gui
+```
+Steps:
+1) Status tab → Check Status.
+2) Capture tab → Start Capture.
+3) View tab → Open Viewer.
+4) Reconstruct tab → Reconstruct.
+5) Measure tab → Measure.
+
+## Optional calibration (better scale accuracy)
+```bash
+python -m kinect_forge calibrate --images calib/*.png --rows 7 --cols 9 --square-size 0.025 \
+  --output intrinsics.json
+
+python -m kinect_forge capture --output scans/calibrated --frames 200 --intrinsics-path intrinsics.json
 ```
 
 ## Local checks
