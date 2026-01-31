@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kinect-forge"
+version = "0.1.0"
+description = "Kinect-based 3D scanning toolkit for Ubuntu"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Nik Reljin"}]
+keywords = ["kinect", "3d", "scanner", "depth", "open3d"]
+
+# Core deps are intentionally minimal; sensor backends are optional extras.
+dependencies = [
+  "numpy>=1.26",
+  "open3d>=0.18",
+  "opencv-python>=4.9",
+  "imageio>=2.34",
+  "trimesh>=4.4",
+  "typer>=0.12",
+  "rich>=13.7",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2",
+  "ruff>=0.6",
+  "mypy>=1.10",
+]
+
+[project.scripts]
+kinect-forge = "kinect_forge.cli:app"
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.10"
+strict = true

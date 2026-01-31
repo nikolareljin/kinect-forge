@@ -1,0 +1,64 @@
+from __future__ import annotations
+
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
+from kinect_forge.config import KinectIntrinsics
+
+
+@dataclass(frozen=True)
+class DatasetMeta:
+    intrinsics: KinectIntrinsics
+    depth_scale: float
+    depth_trunc: float
+    color_format: str = "rgb"
+    depth_unit: str = "mm"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "intrinsics": self.intrinsics.to_dict(),
+            "depth_scale": self.depth_scale,
+            "depth_trunc": self.depth_trunc,
+            "color_format": self.color_format,
+            "depth_unit": self.depth_unit,
+        }
+
+
+def ensure_dirs(root: Path) -> Tuple[Path, Path]:
+    color_dir = root / "color"
+    depth_dir = root / "depth"
+    color_dir.mkdir(parents=True, exist_ok=True)
+    depth_dir.mkdir(parents=True, exist_ok=True)
+    return color_dir, depth_dir
+
+
+def write_metadata(root: Path, meta: DatasetMeta) -> None:
+    path = root / "metadata.json"
+    path.write_text(json.dumps(meta.to_dict(), indent=2))
+
+
+def load_metadata(root: Path) -> DatasetMeta:
+    payload = json.loads((root / "metadata.json").read_text())
+    intrinsics = KinectIntrinsics.from_dict(payload["intrinsics"])
+    return DatasetMeta(
+        intrinsics=intrinsics,
+        depth_scale=float(payload["depth_scale"]),
+        depth_trunc=float(payload["depth_trunc"]),
+        color_format=payload.get("color_format", "rgb"),
+        depth_unit=payload.get("depth_unit", "mm"),
+    )
+
+
+def list_frame_pairs(root: Path) -> List[Tuple[Path, Path]]:
+    color_dir = root / "color"
+    depth_dir = root / "depth"
+    color_files = sorted(color_dir.glob("color_*.png"))
+    pairs: List[Tuple[Path, Path]] = []
+    for color in color_files:
+        idx = color.stem.split("_")[-1]
+        depth = depth_dir / f"depth_{idx}.png"
+        if depth.exists():
+            pairs.append((color, depth))
+    return pairs
