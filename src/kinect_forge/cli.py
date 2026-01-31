@@ -73,7 +73,7 @@ def capture(
     hsv_lower: Optional[str] = typer.Option(None, help="HSV lower bound h,s,v"),
     hsv_upper: Optional[str] = typer.Option(None, help="HSV upper bound h,s,v"),
     turntable_preset: Optional[str] = typer.Option(
-        None, help="Turntable preset: vxb-8 | sutekus-5.4"
+        None, help="Turntable preset: vxb-8"
     ),
     turntable_model: Optional[str] = typer.Option(None, help="Turntable model name"),
     turntable_diameter_mm: Optional[int] = typer.Option(

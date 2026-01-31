@@ -133,7 +133,7 @@ class App:
             color_frame, text="Enable Color Mask", variable=self.capture_color_mask
         ).pack(anchor=tk.W)
 
-        self._entry_row(frame, "Turntable Preset (vxb-8 | sutekus-5.4)", self.capture_turntable_preset, 16)
+        self._entry_row(frame, "Turntable Preset (vxb-8)", self.capture_turntable_preset, 16)
         self._entry_row(frame, "Turntable Model", self.capture_turntable_model, 17)
         self._entry_row(frame, "Turntable Diameter (mm)", self.capture_turntable_diameter, 18)
         self._entry_row(frame, "Rotation Period (s)", self.capture_turntable_rotation, 19)

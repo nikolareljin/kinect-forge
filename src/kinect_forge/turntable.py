@@ -19,17 +19,11 @@ _PRESETS: Dict[str, TurntablePreset] = {
         diameter_mm=200,
         rotation_seconds=16.0,
     ),
-    "sutekus-5.4": TurntablePreset(
-        name="sutekus-5.4",
-        model="Sutekus 5.4-inch rotating display stand",
-        diameter_mm=137,
-        rotation_seconds=15.0,
-    ),
 }
 
 
 def get_turntable_preset(name: str) -> TurntablePreset:
     key = name.lower().strip()
     if key not in _PRESETS:
-        raise ValueError("turntable preset must be one of: vxb-8, sutekus-5.4")
+        raise ValueError("turntable preset must be one of: vxb-8")
     return _PRESETS[key]
