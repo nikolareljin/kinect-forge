@@ -4,7 +4,7 @@ import json
 import threading
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 import tkinter as tk
 from tkinter import filedialog, ttk
