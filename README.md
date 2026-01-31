@@ -28,7 +28,8 @@ Kinect Forge makes this smooth with turntable capture, auto-stop, cleanup, and e
 ```bash
 ./update
 ./setup
-python -m kinect_forge --help
+source .venv/bin/activate
+python3 -m kinect_forge --help
 ```
 
 ## Kinect v1 setup (Ubuntu)
@@ -46,14 +47,14 @@ Plug in the Kinect v1 and verify:
 ./update
 ./setup
 source .venv/bin/activate
-python -m kinect_forge status
+python3 -m kinect_forge status
 ```
 
 Capture + reconstruct:
 ```bash
-python -m kinect_forge capture --output scans/teapot --frames 300
-python -m kinect_forge reconstruct --input-dir scans/teapot --output-mesh scans/teapot/model.ply
-python -m kinect_forge measure --mesh scans/teapot/model.ply
+python3 -m kinect_forge capture --output scans/teapot --frames 300
+python3 -m kinect_forge reconstruct --input-dir scans/teapot --output-mesh scans/teapot/model.ply
+python3 -m kinect_forge measure --mesh scans/teapot/model.ply
 ```
 
 Recommended turntable (budget):
@@ -61,9 +62,9 @@ Recommended turntable (budget):
 
 Turntable preset + keyframe selection + ICP:
 ```bash
-python -m kinect_forge capture --output scans/gear --frames 180 --mode turntable --fps 5 \\
+python3 -m kinect_forge capture --output scans/gear --frames 180 --mode turntable --fps 5 \\
   --turntable-preset vxb-8
-python -m kinect_forge reconstruct --input-dir scans/gear --output-mesh scans/gear/model.obj \\
+python3 -m kinect_forge reconstruct --input-dir scans/gear --output-mesh scans/gear/model.obj \\
   --preset small --icp --smooth 10
 ```
 
@@ -72,7 +73,7 @@ Presets: `small`, `medium`, `large`.
 
 Launch GUI:
 ```bash
-python -m kinect_forge gui
+python3 -m kinect_forge gui
 ```
 
 Cross-platform GUI: Tkinter works on Linux/Windows/macOS, but Kinect v1 capture is primarily supported on Linux via libfreenect.
@@ -104,19 +105,19 @@ Cross-platform GUI: Tkinter works on Linux/Windows/macOS, but Kinect v1 capture 
 
 Background masking (small objects):
 ```bash
-python -m kinect_forge capture --output scans/part --frames 240 --depth-min 0.4 --depth-max 1.2
+python3 -m kinect_forge capture --output scans/part --frames 240 --depth-min 0.4 --depth-max 1.2
 ```
 
 Auto-stop + ROI + color mask example:
 ```bash
-python -m kinect_forge capture --output scans/part --frames 240 --mode turntable --auto-stop \
+python3 -m kinect_forge capture --output scans/part --frames 240 --mode turntable --auto-stop \
   --roi 120,80,320,320 --color-mask --hsv-lower 10,100,100 --hsv-upper 25,255,255
 ```
 
 Preview scans:
 ```bash
-python -m kinect_forge view --dataset scans/part --every 10
-python -m kinect_forge view --mesh scans/part/model.glb
+python3 -m kinect_forge view --dataset scans/part --every 10
+python3 -m kinect_forge view --mesh scans/part/model.glb
 ```
 
 Local checks:
@@ -127,9 +128,9 @@ Local checks:
 
 Calibration (chessboard):
 ```bash
-python -m kinect_forge calibrate --images calib/*.png --rows 7 --cols 9 --square-size 0.025 \\
+python3 -m kinect_forge calibrate --images calib/*.png --rows 7 --cols 9 --square-size 0.025 \\
   --output intrinsics.json
-python -m kinect_forge capture --output scans/calibrated --frames 200 --intrinsics-path intrinsics.json
+python3 -m kinect_forge capture --output scans/calibrated --frames 200 --intrinsics-path intrinsics.json
 ```
 
 ## High-level architecture
