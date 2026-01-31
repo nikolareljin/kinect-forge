@@ -43,6 +43,9 @@ sudo apt install python3-tk
 
 Plug in the Kinect v1 and verify:
 ```bash
+./update
+./setup
+source .venv/bin/activate
 python -m kinect_forge status
 ```
 
