@@ -10,6 +10,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$ROOT_DIR/scripts/include.sh" "$@"
+cd "$ROOT_DIR"
 
 VENV_DIR="${VENV_DIR:-$ROOT_DIR/.venv}"
 if [ ! -d "$VENV_DIR" ]; then

@@ -56,16 +56,18 @@ def calibrate_intrinsics(
     if not objpoints or not imgpoints:
         raise RuntimeError("Not enough calibration images.")
 
-    ret, camera_matrix, _, _, _ = cv2.calibrateCamera(
-        objpoints, imgpoints, image_size, None, None
+    camera_matrix = np.zeros((3, 3), dtype=np.float64)
+    dist_coeffs = np.zeros((5, 1), dtype=np.float64)
+    ret, camera_matrix_out, _, _, _ = cv2.calibrateCamera(
+        objpoints, imgpoints, image_size, camera_matrix, dist_coeffs
     )
     if not ret:
         raise RuntimeError("Calibration failed.")
 
-    fx = float(camera_matrix[0, 0])
-    fy = float(camera_matrix[1, 1])
-    cx = float(camera_matrix[0, 2])
-    cy = float(camera_matrix[1, 2])
+    fx = float(camera_matrix_out[0, 0])
+    fy = float(camera_matrix_out[1, 1])
+    cx = float(camera_matrix_out[0, 2])
+    cy = float(camera_matrix_out[1, 2])
 
     return KinectIntrinsics(
         width=image_size[0],

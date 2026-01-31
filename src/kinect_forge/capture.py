@@ -130,7 +130,7 @@ def capture_frames(
                 depth_m = depth.astype(np.float32) / config.depth_scale
                 last_m = last_saved_depth.astype(np.float32) / config.depth_scale
                 delta = np.mean(np.abs(depth_m - last_m))
-                save_frame = delta >= config.change_threshold
+                save_frame = bool(delta >= config.change_threshold)
 
             if save_frame:
                 color_path = color_dir / f"color_{saved:06d}.png"
