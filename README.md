@@ -19,8 +19,6 @@ from small objects first, then scales to larger scenes later.
 ```bash
 ./update
 ./setup
-python -m venv venv && source venv/bin/activate
-pip install -e .[dev]
 python -m kinect_forge --help
 ```
 
@@ -66,6 +64,16 @@ python -m kinect_forge gui
 ```
 
 Cross-platform GUI: Tkinter works on Linux/Windows/macOS, but Kinect v1 capture is primarily supported on Linux via libfreenect.
+
+## Scripts
+```bash
+./update   # init/update submodules
+./setup    # install system deps + create venv + install python deps
+./lint     # ruff + mypy
+./test     # pytest
+./scripts/package.sh   # build PyInstaller package (Linux/macOS)
+./scripts/package.ps1  # build PyInstaller package (Windows)
+```
 
 ## Documentation
 - `CHANGELOG.md`
