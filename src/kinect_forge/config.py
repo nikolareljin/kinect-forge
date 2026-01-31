@@ -41,6 +41,16 @@ class CaptureConfig:
     depth_min: float = 0.3
     depth_max: float = 2.5
     mask_background: bool = True
+    auto_stop: bool = False
+    auto_stop_patience: int = 30
+    auto_stop_delta: float = 0.002
+    roi_x: int = 0
+    roi_y: int = 0
+    roi_w: int = 0
+    roi_h: int = 0
+    color_mask: bool = False
+    hsv_lower: tuple[int, int, int] = (0, 0, 0)
+    hsv_upper: tuple[int, int, int] = (179, 255, 255)
 
 
 @dataclass(frozen=True)

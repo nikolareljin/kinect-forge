@@ -12,6 +12,7 @@
 - Surface cleanup (outlier removal, hole filling)
 - Turntable workflow
 - Reproducible scan presets
+- GUI control panel
 
 ## Phase 3: Larger scenes
 - Streaming integration for longer scans

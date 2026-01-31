@@ -9,6 +9,7 @@
 - `kinect_forge.export`: mesh export helpers (PLY/OBJ/GLB)
 - `kinect_forge.presets`: tuned reconstruction presets
 - `kinect_forge.viewer`: mesh and dataset preview
+- `kinect_forge.gui`: Tkinter GUI
 - `kinect_forge.io`: file formats and dataset organization
 
 ## Data flow

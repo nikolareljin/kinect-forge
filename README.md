@@ -17,6 +17,7 @@ from small objects first, then scales to larger scenes later.
 
 ## Quick start
 ```bash
+./update
 python -m venv venv && source venv/bin/activate
 pip install -e .[dev]
 python -m kinect_forge --help
@@ -25,6 +26,11 @@ python -m kinect_forge --help
 ## Kinect v1 setup (Ubuntu)
 ```bash
 sudo apt install libfreenect-dev python3-freenect
+```
+
+GUI dependencies:
+```bash
+sudo apt install python3-tk
 ```
 
 Plug in the Kinect v1 and verify:
@@ -49,15 +55,45 @@ python -m kinect_forge reconstruct --input-dir scans/gear --output-mesh scans/ge
 Export formats: use `.ply`, `.obj`, `.stl`, or `.glb` in `--output-mesh`.
 Presets: `small`, `medium`, `large`.
 
+Launch GUI:
+```bash
+python -m kinect_forge gui
+```
+
+Cross-platform GUI: Tkinter works on Linux/Windows/macOS, but Kinect v1 capture is primarily supported on Linux via libfreenect.
+
+## Documentation
+- `CHANGELOG.md`
+- `docs/SETUP.md`
+- `docs/USER_GUIDE.md`
+- `docs/GUI.md`
+- `docs/CAPTURE_WORKFLOW.md`
+- `docs/RECONSTRUCTION.md`
+- `docs/CALIBRATION.md`
+- `docs/TROUBLESHOOTING.md`
+- `docs/PACKAGING.md`
+
 Background masking (small objects):
 ```bash
 python -m kinect_forge capture --output scans/part --frames 240 --depth-min 0.4 --depth-max 1.2
+```
+
+Auto-stop + ROI + color mask example:
+```bash
+python -m kinect_forge capture --output scans/part --frames 240 --mode turntable --auto-stop \
+  --roi 120,80,320,320 --color-mask --hsv-lower 10,100,100 --hsv-upper 25,255,255
 ```
 
 Preview scans:
 ```bash
 python -m kinect_forge view --dataset scans/part --every 10
 python -m kinect_forge view --mesh scans/part/model.glb
+```
+
+Local checks:
+```bash
+./lint
+./test
 ```
 
 Calibration (chessboard):

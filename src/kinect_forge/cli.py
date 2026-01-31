@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import pathlib
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import typer
 from rich.console import Console
@@ -19,6 +19,18 @@ from kinect_forge.viewer import view_dataset, view_mesh
 
 app = typer.Typer(add_completion=False)
 console = Console()
+
+
+def _parse_tuple(value: Optional[str], length: int, label: str) -> Optional[Tuple[int, ...]]:
+    if value is None or value == "":
+        return None
+    parts = [p.strip() for p in value.split(",")]
+    if len(parts) != length:
+        raise typer.BadParameter(f"{label} must have {length} comma-separated values")
+    try:
+        return tuple(int(p) for p in parts)
+    except ValueError as exc:
+        raise typer.BadParameter(f"{label} values must be integers") from exc
 
 
 @app.command()
@@ -50,6 +62,15 @@ def capture(
     depth_min: float = typer.Option(0.3, help="Minimum depth in meters"),
     depth_max: float = typer.Option(2.5, help="Maximum depth in meters"),
     mask_background: bool = typer.Option(True, help="Zero out background pixels"),
+    auto_stop: bool = typer.Option(False, help="Auto-stop turntable capture"),
+    auto_stop_patience: int = typer.Option(30, help="Auto-stop patience frames"),
+    auto_stop_delta: float = typer.Option(0.002, help="Auto-stop delta threshold (m)"),
+    roi: Optional[str] = typer.Option(
+        None, help="ROI as x,y,w,h (pixels). Empty disables ROI."
+    ),
+    color_mask: bool = typer.Option(False, help="Enable HSV color masking"),
+    hsv_lower: Optional[str] = typer.Option(None, help="HSV lower bound h,s,v"),
+    hsv_upper: Optional[str] = typer.Option(None, help="HSV upper bound h,s,v"),
     intrinsics_path: Optional[pathlib.Path] = typer.Option(
         None, help="Optional intrinsics JSON from calibrate"
     ),
@@ -66,7 +87,28 @@ def capture(
         depth_min=depth_min,
         depth_max=depth_max,
         mask_background=mask_background,
+        auto_stop=auto_stop,
+        auto_stop_patience=auto_stop_patience,
+        auto_stop_delta=auto_stop_delta,
+        roi_x=0,
+        roi_y=0,
+        roi_w=0,
+        roi_h=0,
+        color_mask=color_mask,
+        hsv_lower=(0, 0, 0),
+        hsv_upper=(179, 255, 255),
     )
+    roi_tuple = _parse_tuple(roi, 4, "roi")
+    if roi_tuple is not None:
+        config = CaptureConfig(
+            **{**config.__dict__, "roi_x": roi_tuple[0], "roi_y": roi_tuple[1], "roi_w": roi_tuple[2], "roi_h": roi_tuple[3]}
+        )
+    lower = _parse_tuple(hsv_lower, 3, "hsv-lower")
+    upper = _parse_tuple(hsv_upper, 3, "hsv-upper")
+    if lower is not None:
+        config = CaptureConfig(**{**config.__dict__, "hsv_lower": lower})
+    if upper is not None:
+        config = CaptureConfig(**{**config.__dict__, "hsv_upper": upper})
     intrinsics = None
     if intrinsics_path is not None:
         payload = json.loads(intrinsics_path.read_text())
@@ -176,6 +218,14 @@ def view(
         view_mesh(mesh)
     if dataset is not None:
         view_dataset(dataset, every=every)
+
+
+@app.command()
+def gui() -> None:
+    """Launch the desktop GUI."""
+    from kinect_forge.gui import launch_gui
+
+    launch_gui()
 
 
 if __name__ == "__main__":

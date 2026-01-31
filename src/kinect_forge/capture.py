@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
+import cv2
 import imageio.v3 as iio
 import numpy as np
 
@@ -40,6 +41,39 @@ def _apply_depth_mask(
     return color, depth_masked
 
 
+def _apply_roi(
+    color: np.ndarray, depth: np.ndarray, x: int, y: int, w: int, h: int
+) -> tuple[np.ndarray, np.ndarray]:
+    if w <= 0 or h <= 0:
+        return color, depth
+    x0 = max(x, 0)
+    y0 = max(y, 0)
+    x1 = min(x0 + w, color.shape[1])
+    y1 = min(y0 + h, color.shape[0])
+    color_masked = np.zeros_like(color)
+    depth_masked = np.zeros_like(depth)
+    color_masked[y0:y1, x0:x1] = color[y0:y1, x0:x1]
+    depth_masked[y0:y1, x0:x1] = depth[y0:y1, x0:x1]
+    return color_masked, depth_masked
+
+
+def _apply_color_mask(
+    color: np.ndarray,
+    depth: np.ndarray,
+    hsv_lower: tuple[int, int, int],
+    hsv_upper: tuple[int, int, int],
+) -> tuple[np.ndarray, np.ndarray]:
+    hsv = cv2.cvtColor(color, cv2.COLOR_RGB2HSV)
+    lower = np.array(hsv_lower, dtype=np.uint8)
+    upper = np.array(hsv_upper, dtype=np.uint8)
+    mask = cv2.inRange(hsv, lower, upper) > 0
+    color_masked = color.copy()
+    depth_masked = depth.copy()
+    color_masked[~mask] = 0
+    depth_masked[~mask] = 0
+    return color_masked, depth_masked
+
+
 def capture_frames(
     sensor: Sensor,
     output_dir: Path,
@@ -69,6 +103,7 @@ def capture_frames(
         saved = 0
         total = 0
         last_saved_depth: Optional[np.ndarray] = None
+        stagnant = 0
         while saved < config.frames and total < config.max_frames_total:
             total += 1
             frame = sensor.get_frame()
@@ -80,6 +115,13 @@ def capture_frames(
                 config.depth_scale,
                 config.mask_background,
             )
+            color, depth = _apply_roi(
+                color, depth, config.roi_x, config.roi_y, config.roi_w, config.roi_h
+            )
+            if config.color_mask:
+                color, depth = _apply_color_mask(
+                    color, depth, config.hsv_lower, config.hsv_upper
+                )
             save_frame = True
             if config.mode == "turntable" and last_saved_depth is not None:
                 depth_m = depth.astype(np.float32) / config.depth_scale
@@ -94,6 +136,18 @@ def capture_frames(
                 _write_depth(depth_path, depth)
                 last_saved_depth = depth
                 saved += 1
+                stagnant = 0
+            elif config.auto_stop and config.mode == "turntable":
+                if last_saved_depth is not None:
+                    depth_m = depth.astype(np.float32) / config.depth_scale
+                    last_m = last_saved_depth.astype(np.float32) / config.depth_scale
+                    delta = np.mean(np.abs(depth_m - last_m))
+                    if delta < config.auto_stop_delta:
+                        stagnant += 1
+                    else:
+                        stagnant = 0
+                    if stagnant >= config.auto_stop_patience:
+                        break
 
             if frame_period > 0:
                 elapsed = time.monotonic() - last_ts
