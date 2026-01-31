@@ -12,6 +12,9 @@ The GUI runs on Linux, Windows, and macOS via Tkinter. Kinect v1 capture is prim
 ## Packaging note
 See `docs/PACKAGING.md` for creating desktop bundles on Linux/Windows/macOS.
 
+## Recommended turntable (budget)
+- VXB 8-inch motorized display stand (USB or battery powered, ~16s per rotation, 7 lb capacity).
+
 ## System packages
 Install libfreenect and the Python bindings:
 ```bash

@@ -10,7 +10,7 @@
 ## CLI quick start
 ```bash
 python -m kinect_forge capture --output scans/part --frames 240 --mode turntable --fps 5 \
-  --depth-min 0.4 --depth-max 1.2 --auto-stop
+  --depth-min 0.4 --depth-max 1.2 --auto-stop --turntable-preset vxb-8
 python -m kinect_forge reconstruct --input-dir scans/part --output-mesh scans/part/model.glb \
   --preset small --icp
 python -m kinect_forge measure --mesh scans/part/model.glb

@@ -10,6 +10,9 @@ Use this when moving the camera steadily around a static object.
 Captures a frame only when depth changes enough.
 Use this when the object rotates in front of a mostly static camera.
 
+Recommended budget turntable:
+- VXB 8-inch motorized display stand.
+
 Parameters to tune:
 - `--change-threshold` (meters): larger threshold means fewer frames
 - `--max-frames-total`: hard cap for data collection
@@ -24,6 +27,12 @@ Example:
 ```bash
 python -m kinect_forge capture --output scans/part --frames 240 --mode turntable \
   --depth-min 0.4 --depth-max 1.2
+```
+
+Example with a turntable preset:
+```bash
+python -m kinect_forge capture --output scans/part --frames 180 --mode turntable --fps 5 \\
+  --turntable-preset vxb-8 --auto-stop
 ```
 
 ## Color masking

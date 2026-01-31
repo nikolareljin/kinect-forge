@@ -89,6 +89,9 @@ def capture_frames(
         intrinsics=intrinsics,
         depth_scale=config.depth_scale,
         depth_trunc=config.depth_trunc,
+        turntable_model=config.turntable_model,
+        turntable_diameter_mm=config.turntable_diameter_mm,
+        turntable_rotation_seconds=config.turntable_rotation_seconds,
     )
     write_metadata(output_dir, meta)
 

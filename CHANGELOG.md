@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added turntable presets and capture metadata fields for turntable settings.
 
 ## 0.1.0 - 2026-01-31
 - Added Kinect v1 capture pipeline with turntable mode, auto-stop, ROI, and HSV masking.

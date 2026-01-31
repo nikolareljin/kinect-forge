@@ -16,6 +16,7 @@ from kinect_forge.presets import reconstruction_preset
 from kinect_forge.reconstruct import reconstruct_mesh
 from kinect_forge.sensors.freenect_v1 import FreenectV1Sensor, probe_device
 from kinect_forge.viewer import view_dataset, view_mesh
+from kinect_forge.turntable import get_turntable_preset
 
 app = typer.Typer(add_completion=False)
 console = Console()
@@ -71,6 +72,16 @@ def capture(
     color_mask: bool = typer.Option(False, help="Enable HSV color masking"),
     hsv_lower: Optional[str] = typer.Option(None, help="HSV lower bound h,s,v"),
     hsv_upper: Optional[str] = typer.Option(None, help="HSV upper bound h,s,v"),
+    turntable_preset: Optional[str] = typer.Option(
+        None, help="Turntable preset: vxb-8 | sutekus-5.4"
+    ),
+    turntable_model: Optional[str] = typer.Option(None, help="Turntable model name"),
+    turntable_diameter_mm: Optional[int] = typer.Option(
+        None, help="Turntable diameter in mm"
+    ),
+    turntable_rotation_seconds: Optional[float] = typer.Option(
+        None, help="Turntable rotation period in seconds"
+    ),
     intrinsics_path: Optional[pathlib.Path] = typer.Option(
         None, help="Optional intrinsics JSON from calibrate"
     ),
@@ -97,7 +108,20 @@ def capture(
         color_mask=color_mask,
         hsv_lower=(0, 0, 0),
         hsv_upper=(179, 255, 255),
+        turntable_model=turntable_model,
+        turntable_diameter_mm=turntable_diameter_mm,
+        turntable_rotation_seconds=turntable_rotation_seconds,
     )
+    if turntable_preset:
+        preset = get_turntable_preset(turntable_preset)
+        config = CaptureConfig(
+            **{
+                **config.__dict__,
+                "turntable_model": preset.model,
+                "turntable_diameter_mm": preset.diameter_mm,
+                "turntable_rotation_seconds": preset.rotation_seconds,
+            }
+        )
     roi_tuple = _parse_tuple(roi, 4, "roi")
     if roi_tuple is not None:
         config = CaptureConfig(

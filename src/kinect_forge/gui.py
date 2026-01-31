@@ -16,6 +16,7 @@ from kinect_forge.measure import measure_mesh
 from kinect_forge.presets import reconstruction_preset
 from kinect_forge.reconstruct import reconstruct_mesh
 from kinect_forge.sensors.freenect_v1 import FreenectV1Sensor, probe_device
+from kinect_forge.turntable import get_turntable_preset
 from kinect_forge.viewer import view_dataset, view_mesh
 
 
@@ -95,6 +96,10 @@ class App:
         self.capture_color_mask = tk.BooleanVar(value=False)
         self.capture_hsv_lower = tk.StringVar(value="0,0,0")
         self.capture_hsv_upper = tk.StringVar(value="179,255,255")
+        self.capture_turntable_model = tk.StringVar(value="")
+        self.capture_turntable_diameter = tk.StringVar(value="")
+        self.capture_turntable_rotation = tk.StringVar(value="")
+        self.capture_turntable_preset = tk.StringVar(value="")
         self.capture_intrinsics = tk.StringVar(value="")
 
         self._path_row(frame, "Output", self.capture_output, 0, is_dir=True)
@@ -128,7 +133,12 @@ class App:
             color_frame, text="Enable Color Mask", variable=self.capture_color_mask
         ).pack(anchor=tk.W)
 
-        self._path_row(frame, "Intrinsics JSON", self.capture_intrinsics, 16, is_dir=False)
+        self._entry_row(frame, "Turntable Preset (vxb-8 | sutekus-5.4)", self.capture_turntable_preset, 16)
+        self._entry_row(frame, "Turntable Model", self.capture_turntable_model, 17)
+        self._entry_row(frame, "Turntable Diameter (mm)", self.capture_turntable_diameter, 18)
+        self._entry_row(frame, "Rotation Period (s)", self.capture_turntable_rotation, 19)
+
+        self._path_row(frame, "Intrinsics JSON", self.capture_intrinsics, 20, is_dir=False)
 
         def run_capture() -> None:
             sensor = FreenectV1Sensor()
@@ -152,7 +162,24 @@ class App:
                 color_mask=self.capture_color_mask.get(),
                 hsv_lower=(0, 0, 0),
                 hsv_upper=(179, 255, 255),
+                turntable_model=self.capture_turntable_model.get() or None,
+                turntable_diameter_mm=int(self.capture_turntable_diameter.get())
+                if self.capture_turntable_diameter.get()
+                else None,
+                turntable_rotation_seconds=float(self.capture_turntable_rotation.get())
+                if self.capture_turntable_rotation.get()
+                else None,
             )
+            if self.capture_turntable_preset.get():
+                preset = get_turntable_preset(self.capture_turntable_preset.get())
+                config = CaptureConfig(
+                    **{
+                        **config.__dict__,
+                        "turntable_model": preset.model,
+                        "turntable_diameter_mm": preset.diameter_mm,
+                        "turntable_rotation_seconds": preset.rotation_seconds,
+                    }
+                )
             if self.capture_roi.get():
                 roi_parts = [p.strip() for p in self.capture_roi.get().split(",")]
                 if len(roi_parts) == 4:

@@ -45,9 +45,13 @@ python -m kinect_forge reconstruct --input-dir scans/teapot --output-mesh scans/
 python -m kinect_forge measure --mesh scans/teapot/model.ply
 ```
 
+Recommended turntable (budget):
+- VXB 8-inch motorized display stand (USB or battery, 200mm diameter, ~16s per rotation, 7 lb load capacity).
+
 Turntable preset + keyframe selection + ICP:
 ```bash
-python -m kinect_forge capture --output scans/gear --frames 180 --mode turntable --fps 5
+python -m kinect_forge capture --output scans/gear --frames 180 --mode turntable --fps 5 \\
+  --turntable-preset vxb-8
 python -m kinect_forge reconstruct --input-dir scans/gear --output-mesh scans/gear/model.obj \\
   --preset small --icp --smooth 10
 ```

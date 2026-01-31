@@ -16,6 +16,7 @@ Checks whether the Kinect v1 backend is reachable.
 - Depth min/max for background masking
 - Auto-stop for turntable scans
 - ROI and HSV color masking
+- Turntable preset and metadata fields
 - Optional intrinsics JSON
 
 ### Reconstruct
@@ -38,3 +39,4 @@ Use chessboard images to estimate intrinsics and save to JSON.
 - For larger scenes, switch to `medium` or `large`.
 - Use ROI or color masking if the background is noisy.
 - For cross-platform distribution, see `docs/PACKAGING.md`.
+ - Use turntable preset `vxb-8` for the budget recommendation.
