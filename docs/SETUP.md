@@ -76,6 +76,15 @@ Launch GUI with the system venv (recommended when installed via `./install`):
 ./gui
 ```
 
+Capture presets:
+```bash
+# small objects (pots, keychains)
+Capture preset: small-object
+
+# faces (steady pose, good lighting)
+Capture preset: face-scan
+```
+
 Kinect live feed test (dev tool):
 ```bash
 ./scripts/test_kinect.sh --list

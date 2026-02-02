@@ -16,7 +16,7 @@ from kinect_forge.calibration import calibrate_intrinsics, save_intrinsics
 from kinect_forge.capture import capture_frames
 from kinect_forge.config import CaptureConfig, KinectIntrinsics, ReconstructionConfig
 from kinect_forge.measure import measure_mesh
-from kinect_forge.presets import reconstruction_preset
+from kinect_forge.presets import capture_preset, reconstruction_preset
 from kinect_forge.reconstruct import reconstruct_mesh
 from kinect_forge.sensors.freenect_v1 import FreenectV1Sensor, probe_device
 from kinect_forge.turntable import get_turntable_preset
@@ -144,6 +144,7 @@ class App:
         self.capture_turntable_preset = tk.StringVar(value="")
         self.capture_intrinsics = tk.StringVar(value="")
         self.capture_preview = tk.BooleanVar(value=True)
+        self.capture_profile = tk.StringVar(value="")
 
         action_frame = ttk.Frame(frame)
         action_frame.grid(row=0, column=0, columnspan=3, sticky=tk.W, padx=8, pady=8)
@@ -155,6 +156,20 @@ class App:
                 self._log(f"Capture failed: {exc}")
                 self._log("Ensure freenect is installed in this Python environment.")
                 return
+            if self.capture_profile.get():
+                try:
+                    profile = capture_preset(self.capture_profile.get())
+                    self.capture_fps.set(profile["fps"])
+                    self.capture_frames.set(profile["frames"])
+                    self.capture_depth_min.set(profile["depth_min"])
+                    self.capture_depth_max.set(profile["depth_max"])
+                    self.capture_mask.set(profile["mask_background"])
+                    self.capture_auto_stop.set(profile["auto_stop"])
+                    self.capture_auto_patience.set(profile["auto_stop_patience"])
+                    self.capture_auto_delta.set(profile["auto_stop_delta"])
+                except Exception as exc:  # pragma: no cover
+                    self._log(f"Capture preset error: {exc}")
+
             config = CaptureConfig(
                 frames=self.capture_frames.get(),
                 fps=self.capture_fps.get(),
@@ -242,18 +257,19 @@ class App:
         )
         self.capture_button.pack(anchor=tk.W)
 
-        self._path_row(frame, "Output", self.capture_output, 1, is_dir=True)
-        self._entry_row(frame, "Frames", self.capture_frames, 2)
-        self._entry_row(frame, "FPS", self.capture_fps, 3)
-        self._entry_row(frame, "Warmup", self.capture_warmup, 4)
-        self._entry_row(frame, "Mode", self.capture_mode, 5)
-        self._entry_row(frame, "Change Threshold (m)", self.capture_change, 6)
-        self._entry_row(frame, "Max Frames Total", self.capture_max_total, 7)
-        self._entry_row(frame, "Depth Min (m)", self.capture_depth_min, 8)
-        self._entry_row(frame, "Depth Max (m)", self.capture_depth_max, 9)
+        self._entry_row(frame, "Capture Preset (small-object|face-scan)", self.capture_profile, 1)
+        self._path_row(frame, "Output", self.capture_output, 2, is_dir=True)
+        self._entry_row(frame, "Frames", self.capture_frames, 3)
+        self._entry_row(frame, "FPS", self.capture_fps, 4)
+        self._entry_row(frame, "Warmup", self.capture_warmup, 5)
+        self._entry_row(frame, "Mode", self.capture_mode, 6)
+        self._entry_row(frame, "Change Threshold (m)", self.capture_change, 7)
+        self._entry_row(frame, "Max Frames Total", self.capture_max_total, 8)
+        self._entry_row(frame, "Depth Min (m)", self.capture_depth_min, 9)
+        self._entry_row(frame, "Depth Max (m)", self.capture_depth_max, 10)
 
         mask_frame = ttk.Frame(frame)
-        mask_frame.grid(row=10, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
+        mask_frame.grid(row=11, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
         ttk.Checkbutton(mask_frame, text="Mask Background", variable=self.capture_mask).pack(
             anchor=tk.W
         )
@@ -261,27 +277,27 @@ class App:
             anchor=tk.W
         )
 
-        self._entry_row(frame, "Auto-stop Patience", self.capture_auto_patience, 11)
-        self._entry_row(frame, "Auto-stop Delta (m)", self.capture_auto_delta, 12)
-        self._entry_row(frame, "ROI x,y,w,h", self.capture_roi, 13)
-        self._entry_row(frame, "HSV Lower h,s,v", self.capture_hsv_lower, 14)
-        self._entry_row(frame, "HSV Upper h,s,v", self.capture_hsv_upper, 15)
+        self._entry_row(frame, "Auto-stop Patience", self.capture_auto_patience, 12)
+        self._entry_row(frame, "Auto-stop Delta (m)", self.capture_auto_delta, 13)
+        self._entry_row(frame, "ROI x,y,w,h", self.capture_roi, 14)
+        self._entry_row(frame, "HSV Lower h,s,v", self.capture_hsv_lower, 15)
+        self._entry_row(frame, "HSV Upper h,s,v", self.capture_hsv_upper, 16)
 
         color_frame = ttk.Frame(frame)
-        color_frame.grid(row=16, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
+        color_frame.grid(row=17, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
         ttk.Checkbutton(
             color_frame, text="Enable Color Mask", variable=self.capture_color_mask
         ).pack(anchor=tk.W)
 
-        self._entry_row(frame, "Turntable Preset (vxb-8)", self.capture_turntable_preset, 17)
-        self._entry_row(frame, "Turntable Model", self.capture_turntable_model, 18)
-        self._entry_row(frame, "Turntable Diameter (mm)", self.capture_turntable_diameter, 19)
-        self._entry_row(frame, "Rotation Period (s)", self.capture_turntable_rotation, 20)
+        self._entry_row(frame, "Turntable Preset (vxb-8)", self.capture_turntable_preset, 18)
+        self._entry_row(frame, "Turntable Model", self.capture_turntable_model, 19)
+        self._entry_row(frame, "Turntable Diameter (mm)", self.capture_turntable_diameter, 20)
+        self._entry_row(frame, "Rotation Period (s)", self.capture_turntable_rotation, 21)
 
-        self._path_row(frame, "Intrinsics JSON", self.capture_intrinsics, 21, is_dir=False)
+        self._path_row(frame, "Intrinsics JSON", self.capture_intrinsics, 22, is_dir=False)
 
         preview_frame = ttk.Frame(frame)
-        preview_frame.grid(row=22, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
+        preview_frame.grid(row=23, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
         ttk.Checkbutton(
             preview_frame, text="Live Preview (Kinect)", variable=self.capture_preview
         ).pack(anchor=tk.W)

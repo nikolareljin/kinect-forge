@@ -76,3 +76,30 @@ def reconstruction_preset(name: str) -> ReconstructionConfig:
             preset="face-scan",
         )
     raise ValueError("preset must be small, medium, large, small-object, or face-scan")
+
+
+def capture_preset(name: str):
+    preset = name.lower()
+    if preset == "small-object":
+        return {
+            "fps": 15.0,
+            "frames": 220,
+            "depth_min": 0.2,
+            "depth_max": 1.2,
+            "mask_background": True,
+            "auto_stop": True,
+            "auto_stop_patience": 40,
+            "auto_stop_delta": 0.002,
+        }
+    if preset == "face-scan":
+        return {
+            "fps": 20.0,
+            "frames": 140,
+            "depth_min": 0.4,
+            "depth_max": 1.6,
+            "mask_background": False,
+            "auto_stop": False,
+            "auto_stop_patience": 30,
+            "auto_stop_delta": 0.002,
+        }
+    raise ValueError("capture preset must be small-object or face-scan")
