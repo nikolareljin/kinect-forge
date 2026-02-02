@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import threading
 from dataclasses import asdict
 from pathlib import Path
@@ -64,6 +65,18 @@ class App:
 
         label = ttk.Label(frame, text="Check Kinect v1 backend status")
         label.pack(anchor=tk.W, padx=8, pady=8)
+        env_label = ttk.Label(frame, text=f"Python: {sys.executable}")
+        env_label.pack(anchor=tk.W, padx=8, pady=2)
+        freenect_label = ttk.Label(frame, text="Freenect: checking...")
+        freenect_label.pack(anchor=tk.W, padx=8, pady=2)
+
+        try:
+            import freenect  # type: ignore
+
+            _ = freenect  # silence unused
+            freenect_label.config(text="Freenect: import OK")
+        except Exception as exc:  # pragma: no cover
+            freenect_label.config(text=f"Freenect: not available ({exc})")
 
         def check() -> None:
             ok = probe_device()
