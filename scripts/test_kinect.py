@@ -42,6 +42,8 @@ def _open_stream(freenect: object, index: int, depth: bool) -> int:
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     last = time.monotonic()
     while True:
+        if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
+            break
         if depth:
             frame, _ = freenect.sync_get_depth(index=index, format=freenect.DEPTH_MM)
             if frame is None:
