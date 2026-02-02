@@ -49,6 +49,12 @@ If the Kinect opens only with `sudo`, install udev rules:
 ```
 Then unplug/replug the Kinect (or reboot).
 
+The script auto-detects the connected Kinect USB IDs. If the device is not
+plugged in, rerun after connecting it or use:
+```bash
+./scripts/install_udev_rules.sh --fallback-known
+```
+
 If you want to access the Kinect without sudo, you may need udev rules for the device.
 Refer to your distro's libfreenect package documentation for recommended rules.
 
