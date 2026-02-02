@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SCRIPT: install.sh
 # DESCRIPTION: Install kinect-forge into a system venv and expose the CLI.
-# USAGE: scripts/install.sh [--dev] [--prefix <path>] [--bin-link <path>]
+# USAGE: scripts/install.sh [--dev] [--prefix <path>] [--bin-link <path>] [--no-system-deps]
 # ----------------------------------------------------
 set -euo pipefail
 
@@ -13,6 +13,7 @@ INSTALL_ROOT="${INSTALL_ROOT:-/opt/kinect-forge}"
 VENV_DIR="${VENV_DIR:-$INSTALL_ROOT/venv}"
 BIN_LINK="${BIN_LINK:-/usr/local/bin/kinect-forge}"
 DEV_EXTRAS=false
+INSTALL_SYSTEM_DEPS=true
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -20,6 +21,7 @@ while [[ $# -gt 0 ]]; do
     --dev) DEV_EXTRAS=true; shift ;;
     --prefix) INSTALL_ROOT="$2"; VENV_DIR="$INSTALL_ROOT/venv"; shift 2 ;;
     --bin-link) BIN_LINK="$2"; shift 2 ;;
+    --no-system-deps) INSTALL_SYSTEM_DEPS=false; shift ;;
     *) log_error "Unknown argument: $1"; exit 2 ;;
   esac
 done
@@ -27,6 +29,20 @@ done
 if ! command -v sudo >/dev/null 2>&1; then
   log_error "sudo is required to install system packages."
   exit 1
+fi
+
+if $INSTALL_SYSTEM_DEPS; then
+  if command -v apt-get >/dev/null 2>&1; then
+    log_info "Installing system dependencies (libfreenect, tk, build tools)..."
+    sudo apt update
+    sudo apt install -y libfreenect-dev python3-tk build-essential pkg-config cmake
+    if ! sudo apt install -y python3-freenect; then
+      log_warn "python3-freenect not available via apt. Kinect v1 capture may be unavailable."
+      log_warn "See docs/SETUP.md for manual binding options."
+    fi
+  else
+    log_warn "System deps install skipped (apt-get not found)."
+  fi
 fi
 
 PYTHON_BIN=""
