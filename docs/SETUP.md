@@ -71,6 +71,11 @@ pip install -e .[dev]
 python -m kinect_forge status
 ```
 
+Launch GUI with the system venv (recommended when installed via `./install`):
+```bash
+./gui
+```
+
 Kinect live feed test (dev tool):
 ```bash
 ./scripts/test_kinect.sh --list

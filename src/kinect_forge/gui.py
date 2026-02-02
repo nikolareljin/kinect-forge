@@ -166,7 +166,12 @@ class App:
         self.capture_preview_label.pack(anchor=tk.W, pady=4)
 
         def run_capture() -> None:
-            sensor = FreenectV1Sensor()
+            try:
+                sensor = FreenectV1Sensor()
+            except Exception as exc:  # pragma: no cover
+                self._log(f"Capture failed: {exc}")
+                self._log("Ensure freenect is installed in this Python environment.")
+                return
             config = CaptureConfig(
                 frames=self.capture_frames.get(),
                 fps=self.capture_fps.get(),

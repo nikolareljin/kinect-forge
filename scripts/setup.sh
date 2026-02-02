@@ -33,4 +33,15 @@ source "$VENV_DIR/bin/activate"
 python -m pip install --upgrade pip
 python -m pip install -e "${ROOT_DIR}[dev]"
 
+if ! python - <<'PYEOF'
+import importlib
+raise SystemExit(0 if importlib.util.find_spec("freenect") else 1)
+PYEOF
+then
+  echo "Attempting to install freenect bindings into local venv..."
+  if ! python -m pip install freenect; then
+    echo "WARN: pip install freenect failed. See docs/SETUP.md for manual steps." >&2
+  fi
+fi
+
 echo "Setup complete. Activate with: source $VENV_DIR/bin/activate"
