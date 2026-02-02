@@ -18,7 +18,12 @@
       "mask_background": false,
       "auto_stop": false,
       "auto_stop_patience": 30,
-      "auto_stop_delta": 0.002
+      "auto_stop_delta": 0.002,
+      "tilt_sweep": true,
+      "tilt_min": -10.0,
+      "tilt_max": 10.0,
+      "tilt_step": 5.0,
+      "tilt_hold_frames": 30
     }
   },
   "reconstruction": {
