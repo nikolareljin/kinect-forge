@@ -58,6 +58,13 @@ pip install -e .[dev]
 python -m kinect_forge status
 ```
 
+Kinect live feed test (dev tool):
+```bash
+./scripts/test_kinect.sh --list
+./scripts/test_kinect.sh --index 0
+./scripts/test_kinect.sh --index 0 --depth
+```
+
 ## End-to-end test (CLI)
 Capture → preview → reconstruct → measure.
 ```bash
