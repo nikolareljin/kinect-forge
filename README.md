@@ -59,6 +59,21 @@ python -m kinect_forge reconstruct --input-dir scans/teapot --output-mesh scans/
 python -m kinect_forge measure --mesh scans/teapot/model.ply
 ```
 
+Small objects preset:
+```bash
+python -m kinect_forge capture --capture-preset small-object --output scans/keychain
+python -m kinect_forge reconstruct --input-dir scans/keychain --output-mesh scans/keychain/model.ply \
+  --preset small-object
+```
+
+Face scan preset + tilt sweep:
+```bash
+python -m kinect_forge capture --capture-preset face-scan --output scans/face \
+  --tilt-sweep --tilt-min -10 --tilt-max 10 --tilt-step 5 --tilt-hold-frames 30
+python -m kinect_forge reconstruct --input-dir scans/face --output-mesh scans/face/model.ply \
+  --preset face-scan
+```
+
 Recommended turntable (budget):
 - VXB 8-inch motorized display stand (USB or battery, 200mm diameter, ~16s per rotation, 7 lb load capacity).
 
@@ -71,11 +86,11 @@ python -m kinect_forge reconstruct --input-dir scans/gear --output-mesh scans/ge
 ```
 
 Export formats: use `.ply`, `.obj`, `.stl`, or `.glb` in `--output-mesh`.
-Presets: `small`, `medium`, `large`.
+Presets: `small`, `medium`, `large`, `small-object`, `face-scan` (see `config/presets.json`).
 
 Launch GUI:
 ```bash
-python -m kinect_forge gui
+./gui
 ```
 
 Cross-platform GUI: Tkinter works on Linux/Windows/macOS, but Kinect v1 capture is primarily supported on Linux via libfreenect.
@@ -94,6 +109,7 @@ Cross-platform GUI: Tkinter works on Linux/Windows/macOS, but Kinect v1 capture 
 
 ## Documentation
 - `CHANGELOG.md`
+- `docs/CONFIG.md`
 - `docs/SETUP.md`
 - `docs/USER_GUIDE.md`
 - `docs/GUI.md`
