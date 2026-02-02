@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import cv2
 import imageio.v3 as iio
@@ -79,6 +79,7 @@ def capture_frames(
     output_dir: Path,
     config: CaptureConfig,
     intrinsics: Optional[KinectIntrinsics] = None,
+    preview_cb: Optional[Callable[[np.ndarray, np.ndarray], None]] = None,
 ) -> None:
     if config.mode not in {"standard", "turntable"}:
         raise ValueError("mode must be 'standard' or 'turntable'")
@@ -110,6 +111,8 @@ def capture_frames(
         while saved < config.frames and total < config.max_frames_total:
             total += 1
             frame = sensor.get_frame()
+            if preview_cb is not None:
+                preview_cb(frame.color, frame.depth)
             color, depth = _apply_depth_mask(
                 frame.color,
                 frame.depth,

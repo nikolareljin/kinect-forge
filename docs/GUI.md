@@ -15,6 +15,7 @@ Checks whether the Kinect v1 backend is reachable.
 - Turntable mode to reduce redundant frames
 - Depth min/max for background masking
 - Auto-stop for turntable scans
+- Live preview (Kinect v1 feed during capture)
 - ROI and HSV color masking
 - Turntable preset and metadata fields
 - Optional intrinsics JSON

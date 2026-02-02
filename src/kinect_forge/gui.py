@@ -4,10 +4,12 @@ import json
 import threading
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 
 import tkinter as tk
 from tkinter import filedialog, ttk
+
+import numpy as np
 
 from kinect_forge.calibration import calibrate_intrinsics, save_intrinsics
 from kinect_forge.capture import capture_frames
@@ -24,6 +26,7 @@ class App:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("Kinect Forge")
+        self._preview_image: Optional[tk.PhotoImage] = None
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -101,6 +104,7 @@ class App:
         self.capture_turntable_rotation = tk.StringVar(value="")
         self.capture_turntable_preset = tk.StringVar(value="")
         self.capture_intrinsics = tk.StringVar(value="")
+        self.capture_preview = tk.BooleanVar(value=True)
 
         self._path_row(frame, "Output", self.capture_output, 0, is_dir=True)
         self._entry_row(frame, "Frames", self.capture_frames, 1)
@@ -139,6 +143,14 @@ class App:
         self._entry_row(frame, "Rotation Period (s)", self.capture_turntable_rotation, 19)
 
         self._path_row(frame, "Intrinsics JSON", self.capture_intrinsics, 20, is_dir=False)
+
+        preview_frame = ttk.Frame(frame)
+        preview_frame.grid(row=21, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
+        ttk.Checkbutton(
+            preview_frame, text="Live Preview (Kinect)", variable=self.capture_preview
+        ).pack(anchor=tk.W)
+        self.capture_preview_label = ttk.Label(preview_frame)
+        self.capture_preview_label.pack(anchor=tk.W, pady=4)
 
         def run_capture() -> None:
             sensor = FreenectV1Sensor()
@@ -204,11 +216,48 @@ class App:
             if self.capture_intrinsics.get():
                 payload = json.loads(Path(self.capture_intrinsics.get()).read_text())
                 intrinsics = KinectIntrinsics.from_dict(payload)
-            capture_frames(sensor, Path(self.capture_output.get()), config, intrinsics=intrinsics)
+
+            def preview_cb(color: np.ndarray, depth: np.ndarray) -> None:
+                if not self.capture_preview.get():
+                    return
+                ppm = self._to_ppm_bytes(color)
+                if not ppm:
+                    return
+                self.root.after(0, self._update_preview, ppm)
+
+            capture_frames(
+                sensor,
+                Path(self.capture_output.get()),
+                config,
+                intrinsics=intrinsics,
+                preview_cb=preview_cb,
+            )
 
         ttk.Button(frame, text="Start Capture", command=lambda: self._run_task("capture", run_capture)).grid(
             row=11, column=0, padx=8, pady=8, sticky=tk.W
         )
+
+    @staticmethod
+    def _to_ppm_bytes(color: np.ndarray, max_width: int = 480) -> bytes:
+        if color.ndim != 3 or color.shape[2] != 3:
+            return b""
+        height, width, _ = color.shape
+        step = 1
+        if width > max_width:
+            step = max(1, width // max_width)
+        if step > 1:
+            color = color[::step, ::step]
+            height, width, _ = color.shape
+        color = np.ascontiguousarray(color)
+        header = f"P6 {width} {height} 255\n".encode("ascii")
+        return header + color.tobytes()
+
+    def _update_preview(self, ppm: bytes) -> None:
+        if not self.capture_preview.get():
+            return
+        image = tk.PhotoImage(data=ppm)
+        self._preview_image = image
+        self.capture_preview_label.configure(image=image)
 
     def _build_reconstruct_tab(self) -> None:
         frame = ttk.Frame(self.notebook)
