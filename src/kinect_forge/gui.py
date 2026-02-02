@@ -43,10 +43,23 @@ class App:
         self._build_measure_tab()
         self._build_view_tab()
         self._build_calibrate_tab()
+        self.root.after(500, self._refresh_dataset_state)
 
     def _log(self, message: str) -> None:
         self.log_text.insert(tk.END, message + "\n")
         self.log_text.see(tk.END)
+
+    def _dataset_ready(self, root: str) -> bool:
+        if not root:
+            return False
+        return (Path(root) / "metadata.json").is_file()
+
+    def _require_dataset(self, root: str, label: str) -> bool:
+        if self._dataset_ready(root):
+            return True
+        self._log(f"[{label}] error: metadata.json not found in {root}")
+        self._log("Run Capture first to create a dataset.")
+        return False
 
     def _run_task(self, label: str, fn: Callable[[], None]) -> None:
         def runner() -> None:
@@ -250,6 +263,7 @@ class App:
                 intrinsics=intrinsics,
                 preview_cb=preview_cb,
             )
+            self._log("Capture dataset ready.")
 
         ttk.Button(frame, text="Start Capture", command=lambda: self._run_task("capture", run_capture)).grid(
             row=11, column=0, padx=8, pady=8, sticky=tk.W
@@ -276,6 +290,21 @@ class App:
         image = tk.PhotoImage(data=ppm)
         self._preview_image = image
         self.capture_preview_label.configure(image=image)
+
+    def _refresh_dataset_state(self) -> None:
+        capture_root = self.capture_output.get()
+        dataset_ready = self._dataset_ready(capture_root)
+        if dataset_ready:
+            if not self.view_dataset_path.get():
+                self.view_dataset_path.set(capture_root)
+            if not self.recon_input.get():
+                self.recon_input.set(capture_root)
+            self.view_button.state(["!disabled"])
+            self.recon_button.state(["!disabled"])
+        else:
+            self.view_button.state(["disabled"])
+            self.recon_button.state(["disabled"])
+        self.root.after(1000, self._refresh_dataset_state)
 
     def _build_reconstruct_tab(self) -> None:
         frame = ttk.Frame(self.notebook)
@@ -330,6 +359,8 @@ class App:
             self.recon_fill.set(preset_cfg.fill_hole_radius)
 
         def run_reconstruct() -> None:
+            if not self._require_dataset(self.recon_input.get(), "reconstruct"):
+                return
             config = ReconstructionConfig(
                 voxel_length=self.recon_voxel.get(),
                 sdf_trunc=self.recon_sdf.get(),
@@ -346,11 +377,13 @@ class App:
             )
             reconstruct_mesh(Path(self.recon_input.get()), Path(self.recon_output.get()), config)
 
-        ttk.Button(
+        self.recon_button = ttk.Button(
             frame,
             text="Reconstruct",
             command=lambda: self._run_task("reconstruct", run_reconstruct),
-        ).grid(row=14, column=0, padx=8, pady=8, sticky=tk.W)
+        )
+        self.recon_button.grid(row=14, column=0, padx=8, pady=8, sticky=tk.W)
+        self.recon_button.state(["disabled"])
 
         ttk.Button(frame, text="Apply Preset", command=apply_preset).grid(
             row=14, column=1, padx=8, pady=8, sticky=tk.W
@@ -397,14 +430,18 @@ class App:
         self._entry_row(frame, "Every Nth Frame", self.view_every, 2)
 
         def run_view() -> None:
+            if self.view_dataset_path.get():
+                if not self._require_dataset(self.view_dataset_path.get(), "view"):
+                    return
+                view_dataset(Path(self.view_dataset_path.get()), every=self.view_every.get())
             if self.view_mesh_path.get():
                 view_mesh(Path(self.view_mesh_path.get()))
-            if self.view_dataset_path.get():
-                view_dataset(Path(self.view_dataset_path.get()), every=self.view_every.get())
 
-        ttk.Button(frame, text="Open Viewer", command=lambda: self._run_task("view", run_view)).grid(
-            row=3, column=0, padx=8, pady=8, sticky=tk.W
+        self.view_button = ttk.Button(
+            frame, text="Open Viewer", command=lambda: self._run_task("view", run_view)
         )
+        self.view_button.grid(row=3, column=0, padx=8, pady=8, sticky=tk.W)
+        self.view_button.state(["disabled"])
 
     def _build_calibrate_tab(self) -> None:
         frame = ttk.Frame(self.notebook)
