@@ -84,6 +84,8 @@ Cross-platform GUI: Tkinter works on Linux/Windows/macOS, but Kinect v1 capture 
 ```bash
 ./update   # init/update submodules
 ./setup    # install system deps + create venv + install python deps
+./install  # install system venv + CLI symlink (testing)
+./uninstall # remove system install
 ./lint     # ruff + mypy
 ./test     # pytest
 ./scripts/package.sh   # build PyInstaller package (Linux/macOS)
