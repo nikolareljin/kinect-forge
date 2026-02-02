@@ -37,8 +37,10 @@ sudo apt install -y libfreenect-dev python3-tk \
 sudo apt install -y python3-freenect || true
 ```
 
-`./install` on Ubuntu performs the same dependency install by default. Use
-`./install --no-system-deps` if you want to skip apt installs.
+`./install` on Ubuntu performs the same dependency install by default. If
+`python3-freenect` is unavailable (Ubuntu 24.04+), it will attempt
+`pip install freenect` into the system venv. Use `./install --no-system-deps`
+if you want to skip apt installs.
 
 If you want to access the Kinect without sudo, you may need udev rules for the device.
 Refer to your distro's libfreenect package documentation for recommended rules.
