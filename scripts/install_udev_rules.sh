@@ -18,7 +18,7 @@ fi
 
 declare -a product_ids=()
 while IFS= read -r line; do
-  if [[ "$line" =~ ID[[:space:]]045e:([0-9a-fA-F]{4}) ]] && [[ "$line" =~ [Kk]inect ]]; then
+  if [[ "$line" =~ ID[[:space:]]045e:([0-9a-fA-F]{4}).*[Kk]inect ]]; then
     product_ids+=("${BASH_REMATCH[1],,}")
   fi
 done < <(lsusb)
