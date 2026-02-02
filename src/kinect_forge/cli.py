@@ -145,7 +145,10 @@ def capture(
 def reconstruct(
     input_dir: pathlib.Path = typer.Option(..., help="Directory with captured frames"),
     output_mesh: pathlib.Path = typer.Option("model.ply", help="Output mesh file"),
-    preset: str = typer.Option("small", help="Reconstruction preset: small|medium|large"),
+    preset: str = typer.Option(
+        "small",
+        help="Reconstruction preset: small|medium|large|small-object|face-scan",
+    ),
     voxel_length: Optional[float] = typer.Option(None, help="TSDF voxel size in meters"),
     sdf_trunc: Optional[float] = typer.Option(None, help="TSDF truncation distance in meters"),
     depth_scale: Optional[float] = typer.Option(None, help="Depth scale (mm -> meters)"),

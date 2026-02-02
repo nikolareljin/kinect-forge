@@ -47,4 +47,32 @@ def reconstruction_preset(name: str) -> ReconstructionConfig:
             fill_hole_radius=0.0,
             preset="large",
         )
-    raise ValueError("preset must be small, medium, or large")
+    if preset == "small-object":
+        return ReconstructionConfig(
+            voxel_length=0.0025,
+            sdf_trunc=0.02,
+            depth_trunc=1.5,
+            keyframe_threshold=0.002,
+            icp_refine=True,
+            icp_distance=0.01,
+            icp_voxel=0.006,
+            icp_iterations=50,
+            smooth_iterations=6,
+            fill_hole_radius=0.006,
+            preset="small-object",
+        )
+    if preset == "face-scan":
+        return ReconstructionConfig(
+            voxel_length=0.003,
+            sdf_trunc=0.025,
+            depth_trunc=1.5,
+            keyframe_threshold=0.003,
+            icp_refine=True,
+            icp_distance=0.012,
+            icp_voxel=0.007,
+            icp_iterations=45,
+            smooth_iterations=4,
+            fill_hole_radius=0.01,
+            preset="face-scan",
+        )
+    raise ValueError("preset must be small, medium, large, small-object, or face-scan")

@@ -10,6 +10,8 @@
 - `small`: higher resolution, better for tabletop items
 - `medium`: balanced for larger objects
 - `large`: faster, coarser for big scenes
+- `small-object`: extra detail for keychains, pots, and small parts
+- `face-scan`: tuned for faces at ~0.6–1.2m with minimal motion
 
 ## Key parameters
 - `voxel_length`: smaller values give more detail but require more compute

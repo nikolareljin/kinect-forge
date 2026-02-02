@@ -348,7 +348,7 @@ class App:
 
         self._path_row(frame, "Input Dataset", self.recon_input, 0, is_dir=True)
         self._path_row(frame, "Output Mesh", self.recon_output, 1, is_dir=False, is_save=True)
-        self._entry_row(frame, "Preset", self.recon_preset, 2)
+        self._entry_row(frame, "Preset (small|medium|large|small-object|face-scan)", self.recon_preset, 2)
         self._entry_row(frame, "Voxel Length", self.recon_voxel, 3)
         self._entry_row(frame, "SDF Trunc", self.recon_sdf, 4)
         self._entry_row(frame, "Depth Scale", self.recon_depth_scale, 5)
