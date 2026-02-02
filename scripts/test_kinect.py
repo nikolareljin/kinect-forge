@@ -23,7 +23,14 @@ def _require_freenect() -> object:
 
 
 def _list_devices(freenect: object) -> int:
-    count = int(freenect.num_devices())
+    ctx = freenect.init()
+    if ctx is None:
+        print("Failed to initialize freenect context.", file=sys.stderr)
+        return 1
+    try:
+        count = int(freenect.num_devices(ctx))
+    finally:
+        freenect.shutdown(ctx)
     print(f"Kinect v1 devices detected: {count}")
     if count > 0:
         print("Indices:", ", ".join(str(i) for i in range(count)))
