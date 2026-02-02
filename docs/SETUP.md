@@ -42,6 +42,13 @@ sudo apt install -y python3-freenect || true
 `pip install freenect` into the system venv. Use `./install --no-system-deps`
 if you want to skip apt installs.
 
+## USB permissions (udev)
+If the Kinect opens only with `sudo`, install udev rules:
+```bash
+./scripts/install_udev_rules.sh
+```
+Then unplug/replug the Kinect (or reboot).
+
 If you want to access the Kinect without sudo, you may need udev rules for the device.
 Refer to your distro's libfreenect package documentation for recommended rules.
 

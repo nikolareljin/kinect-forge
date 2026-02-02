@@ -54,6 +54,10 @@ def _open_stream(freenect: object, index: int, depth: bool) -> int:
             frame, _ = freenect.sync_get_video(index=index, format=freenect.VIDEO_RGB)
             if frame is None:
                 print("Failed to read color frame.", file=sys.stderr)
+                print(
+                    "If this works with sudo, install udev rules (scripts/install_udev_rules.sh).",
+                    file=sys.stderr,
+                )
                 return 1
             color = np.asarray(frame, dtype=np.uint8)
             cv2.imshow(window_name, cv2.cvtColor(color, cv2.COLOR_RGB2BGR))

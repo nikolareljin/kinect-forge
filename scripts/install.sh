@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SCRIPT: install.sh
 # DESCRIPTION: Install kinect-forge into a system venv and expose the CLI.
-# USAGE: scripts/install.sh [--dev] [--prefix <path>] [--bin-link <path>] [--no-system-deps]
+# USAGE: scripts/install.sh [--dev] [--prefix <path>] [--bin-link <path>] [--no-system-deps] [--no-udev]
 # ----------------------------------------------------
 set -euo pipefail
 
@@ -14,6 +14,7 @@ VENV_DIR="${VENV_DIR:-$INSTALL_ROOT/venv}"
 BIN_LINK="${BIN_LINK:-/usr/local/bin/kinect-forge}"
 DEV_EXTRAS=false
 INSTALL_SYSTEM_DEPS=true
+INSTALL_UDEV=true
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -22,6 +23,7 @@ while [[ $# -gt 0 ]]; do
     --prefix) INSTALL_ROOT="$2"; VENV_DIR="$INSTALL_ROOT/venv"; shift 2 ;;
     --bin-link) BIN_LINK="$2"; shift 2 ;;
     --no-system-deps) INSTALL_SYSTEM_DEPS=false; shift ;;
+    --no-udev) INSTALL_UDEV=false; shift ;;
     *) log_error "Unknown argument: $1"; exit 2 ;;
   esac
 done
@@ -42,6 +44,15 @@ if $INSTALL_SYSTEM_DEPS; then
     fi
   else
     log_warn "System deps install skipped (apt-get not found)."
+  fi
+fi
+
+if $INSTALL_UDEV; then
+  if [[ -x "$ROOT_DIR/scripts/install_udev_rules.sh" ]]; then
+    log_info "Installing udev rules for Kinect v1..."
+    sudo "$ROOT_DIR/scripts/install_udev_rules.sh"
+  else
+    log_warn "Missing install_udev_rules.sh; skipping udev rules."
   fi
 fi
 
