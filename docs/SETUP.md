@@ -18,7 +18,9 @@ See `docs/PACKAGING.md` for creating desktop bundles on Linux/Windows/macOS.
 ## System packages
 Install libfreenect and the Python bindings:
 ```bash
-sudo apt install libfreenect-dev python3-freenect
+sudo apt install libfreenect-dev
+# Optional (bindings may be unavailable on some Ubuntu versions):
+sudo apt install python3-freenect || true
 ```
 
 GUI package (optional):
@@ -29,8 +31,10 @@ sudo apt install python3-tk
 Recommended full install (Ubuntu):
 ```bash
 sudo apt update
-sudo apt install -y libfreenect-dev python3-freenect python3-tk \
+sudo apt install -y libfreenect-dev python3-tk \
   build-essential pkg-config cmake
+# Optional (bindings may be unavailable on some Ubuntu versions):
+sudo apt install -y python3-freenect || true
 ```
 
 If you want to access the Kinect without sudo, you may need udev rules for the device.

@@ -17,8 +17,11 @@ if ! command -v sudo >/dev/null 2>&1; then
 fi
 
 sudo apt update
-sudo apt install -y libfreenect-dev python3-freenect python3-tk \
+sudo apt install -y libfreenect-dev python3-tk \
   build-essential pkg-config cmake
+if ! sudo apt install -y python3-freenect; then
+  echo "WARN: python3-freenect package not found. Kinect v1 capture will be unavailable unless you install freenect bindings manually." >&2
+fi
 
 VENV_DIR="${VENV_DIR:-$ROOT_DIR/.venv}"
 if [ ! -d "$VENV_DIR" ]; then

@@ -34,7 +34,9 @@ python -m kinect_forge --help
 
 ## Kinect v1 setup (Ubuntu)
 ```bash
-sudo apt install libfreenect-dev python3-freenect
+sudo apt install libfreenect-dev
+# Optional (bindings may be unavailable on some Ubuntu versions):
+sudo apt install python3-freenect || true
 ```
 
 GUI dependencies:
