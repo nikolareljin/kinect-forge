@@ -7,7 +7,7 @@
 - `kinect_forge.measure`: dimensions and volume utilities
 - `kinect_forge.calibration`: chessboard-based intrinsics calibration
 - `kinect_forge.export`: mesh export helpers (PLY/OBJ/GLB)
-- `kinect_forge.presets`: tuned reconstruction presets
+- `kinect_forge.presets`: configurable capture/reconstruction presets
 - `kinect_forge.turntable`: turntable preset metadata
 - `kinect_forge.viewer`: mesh and dataset preview
 - `kinect_forge.gui`: Tkinter GUI

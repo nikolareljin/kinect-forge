@@ -90,6 +90,17 @@ CLI example:
 python -m kinect_forge capture --capture-preset small-object --output captures
 ```
 
+Preset configuration lives in `config/presets.json`. You can override with:
+```bash
+export KINECT_FORGE_PRESETS=/path/to/presets.json
+```
+
+## Tilt control (up/down only)
+Kinect v1 supports tilt up/down (no left/right). Use:
+```bash
+python -m kinect_forge tilt --angle 10
+```
+
 Kinect live feed test (dev tool):
 ```bash
 ./scripts/test_kinect.sh --list
