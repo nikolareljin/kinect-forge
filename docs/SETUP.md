@@ -85,6 +85,11 @@ Capture preset: small-object
 Capture preset: face-scan
 ```
 
+CLI example:
+```bash
+python -m kinect_forge capture --capture-preset small-object --output captures
+```
+
 Kinect live feed test (dev tool):
 ```bash
 ./scripts/test_kinect.sh --list

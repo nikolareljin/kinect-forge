@@ -12,7 +12,7 @@ from kinect_forge.capture import capture_frames
 from kinect_forge.config import CaptureConfig, ReconstructionConfig
 from kinect_forge.config import KinectIntrinsics
 from kinect_forge.measure import measure_mesh
-from kinect_forge.presets import reconstruction_preset
+from kinect_forge.presets import capture_preset, reconstruction_preset
 from kinect_forge.reconstruct import reconstruct_mesh
 from kinect_forge.sensors.freenect_v1 import FreenectV1Sensor, probe_device
 from kinect_forge.viewer import view_dataset, view_mesh
@@ -85,8 +85,21 @@ def capture(
     intrinsics_path: Optional[pathlib.Path] = typer.Option(
         None, help="Optional intrinsics JSON from calibrate"
     ),
+    capture_preset_name: Optional[str] = typer.Option(
+        None, "--capture-preset", help="Capture preset: small-object|face-scan"
+    ),
 ) -> None:
     """Capture RGB-D frames using Kinect v1 (libfreenect)."""
+    if capture_preset_name:
+        profile = capture_preset(capture_preset_name)
+        fps = profile["fps"]
+        frames = profile["frames"]
+        depth_min = profile["depth_min"]
+        depth_max = profile["depth_max"]
+        mask_background = profile["mask_background"]
+        auto_stop = profile["auto_stop"]
+        auto_stop_patience = profile["auto_stop_patience"]
+        auto_stop_delta = profile["auto_stop_delta"]
     sensor = FreenectV1Sensor()
     config = CaptureConfig(
         frames=frames,
