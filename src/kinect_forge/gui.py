@@ -128,8 +128,8 @@ class App:
         self.capture_mode = tk.StringVar(value="standard")
         self.capture_change = tk.DoubleVar(value=0.01)
         self.capture_max_total = tk.IntVar(value=3000)
-        self.capture_depth_min = tk.DoubleVar(value=0.3)
-        self.capture_depth_max = tk.DoubleVar(value=2.5)
+        self.capture_depth_min = tk.DoubleVar(value=0.1)
+        self.capture_depth_max = tk.DoubleVar(value=4.0)
         self.capture_mask = tk.BooleanVar(value=True)
         self.capture_auto_stop = tk.BooleanVar(value=False)
         self.capture_auto_patience = tk.IntVar(value=30)
@@ -237,7 +237,7 @@ class App:
 
         self.capture_button = ttk.Button(
             action_frame,
-            text="● Start Capture",
+            text="[REC] Start Capture",
             command=lambda: self._run_task("capture", run_capture),
         )
         self.capture_button.pack(anchor=tk.W)

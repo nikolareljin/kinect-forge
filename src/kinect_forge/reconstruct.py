@@ -72,6 +72,24 @@ def _select_keyframes(
     return selected
 
 
+def _assert_depth_frames(pairs: List[Tuple[Path, Path]], depth_scale: float) -> None:
+    sample = pairs[: min(5, len(pairs))]
+    if not sample:
+        return
+    ratios: List[float] = []
+    for _, depth_path in sample:
+        depth = o3d.io.read_image(str(depth_path))
+        depth_arr = np.asarray(depth).astype(np.float32) / depth_scale
+        if depth_arr.size == 0:
+            continue
+        ratios.append(float(np.count_nonzero(depth_arr) / depth_arr.size))
+    if ratios and max(ratios) < 0.01:
+        raise RuntimeError(
+            "Depth frames are mostly empty. Check capture depth_min/depth_max or disable "
+            "background masking."
+        )
+
+
 def _rgbd_to_pcd(
     rgbd: o3d.geometry.RGBDImage,
     intrinsic: o3d.camera.PinholeCameraIntrinsic,
@@ -139,6 +157,7 @@ def reconstruct_mesh(input_dir: Path, output_mesh: Path, config: ReconstructionC
     pairs = _select_keyframes(pairs, depth_scale, config.keyframe_threshold)
     if not pairs:
         raise RuntimeError("Keyframe selection removed all frames.")
+    _assert_depth_frames(pairs, depth_scale)
 
     intrinsic = o3d.camera.PinholeCameraIntrinsic(
         meta.intrinsics.width,

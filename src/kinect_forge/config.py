@@ -38,8 +38,8 @@ class CaptureConfig:
     mode: str = "standard"
     change_threshold: float = 0.01
     max_frames_total: int = 3000
-    depth_min: float = 0.3
-    depth_max: float = 2.5
+    depth_min: float = 0.1
+    depth_max: float = 4.0
     mask_background: bool = True
     auto_stop: bool = False
     auto_stop_patience: int = 30
