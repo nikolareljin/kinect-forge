@@ -27,6 +27,8 @@ def _to_trimesh(mesh: o3d.geometry.TriangleMesh) -> trimesh.Trimesh:
 
 
 def write_mesh(path: Path, mesh: o3d.geometry.TriangleMesh) -> None:
+    if mesh.is_empty():
+        raise RuntimeError("Mesh is empty or could not be generated.")
     suffix = path.suffix.lower()
     if suffix in {".glb", ".gltf"}:
         tm = _to_trimesh(mesh)

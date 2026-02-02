@@ -176,6 +176,8 @@ def reconstruct_mesh(input_dir: Path, output_mesh: Path, config: ReconstructionC
 
     mesh = volume.extract_triangle_mesh()
     mesh = _clean_mesh(mesh, config)
+    if mesh.is_empty():
+        raise RuntimeError("Reconstruction produced an empty mesh.")
 
     output_mesh.parent.mkdir(parents=True, exist_ok=True)
     write_mesh(output_mesh, mesh)

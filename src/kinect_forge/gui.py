@@ -61,6 +61,19 @@ class App:
         self._log("Run Capture first to create a dataset.")
         return False
 
+    def _require_mesh(self, path: str, label: str) -> bool:
+        if not path:
+            self._log(f"[{label}] error: mesh path is empty")
+            return False
+        mesh_path = Path(path)
+        if not mesh_path.is_file():
+            self._log(f"[{label}] error: mesh file not found: {mesh_path}")
+            return False
+        if mesh_path.stat().st_size == 0:
+            self._log(f"[{label}] error: mesh file is empty: {mesh_path}")
+            return False
+        return True
+
     def _run_task(self, label: str, fn: Callable[[], None]) -> None:
         def runner() -> None:
             self._log(f"[{label}] started")
@@ -132,51 +145,8 @@ class App:
         self.capture_intrinsics = tk.StringVar(value="")
         self.capture_preview = tk.BooleanVar(value=True)
 
-        self._path_row(frame, "Output", self.capture_output, 0, is_dir=True)
-        self._entry_row(frame, "Frames", self.capture_frames, 1)
-        self._entry_row(frame, "FPS", self.capture_fps, 2)
-        self._entry_row(frame, "Warmup", self.capture_warmup, 3)
-        self._entry_row(frame, "Mode", self.capture_mode, 4)
-        self._entry_row(frame, "Change Threshold (m)", self.capture_change, 5)
-        self._entry_row(frame, "Max Frames Total", self.capture_max_total, 6)
-        self._entry_row(frame, "Depth Min (m)", self.capture_depth_min, 7)
-        self._entry_row(frame, "Depth Max (m)", self.capture_depth_max, 8)
-
-        mask_frame = ttk.Frame(frame)
-        mask_frame.grid(row=9, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
-        ttk.Checkbutton(mask_frame, text="Mask Background", variable=self.capture_mask).pack(
-            anchor=tk.W
-        )
-        ttk.Checkbutton(mask_frame, text="Auto-stop", variable=self.capture_auto_stop).pack(
-            anchor=tk.W
-        )
-
-        self._entry_row(frame, "Auto-stop Patience", self.capture_auto_patience, 10)
-        self._entry_row(frame, "Auto-stop Delta (m)", self.capture_auto_delta, 11)
-        self._entry_row(frame, "ROI x,y,w,h", self.capture_roi, 12)
-        self._entry_row(frame, "HSV Lower h,s,v", self.capture_hsv_lower, 13)
-        self._entry_row(frame, "HSV Upper h,s,v", self.capture_hsv_upper, 14)
-
-        color_frame = ttk.Frame(frame)
-        color_frame.grid(row=15, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
-        ttk.Checkbutton(
-            color_frame, text="Enable Color Mask", variable=self.capture_color_mask
-        ).pack(anchor=tk.W)
-
-        self._entry_row(frame, "Turntable Preset (vxb-8)", self.capture_turntable_preset, 16)
-        self._entry_row(frame, "Turntable Model", self.capture_turntable_model, 17)
-        self._entry_row(frame, "Turntable Diameter (mm)", self.capture_turntable_diameter, 18)
-        self._entry_row(frame, "Rotation Period (s)", self.capture_turntable_rotation, 19)
-
-        self._path_row(frame, "Intrinsics JSON", self.capture_intrinsics, 20, is_dir=False)
-
-        preview_frame = ttk.Frame(frame)
-        preview_frame.grid(row=21, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
-        ttk.Checkbutton(
-            preview_frame, text="Live Preview (Kinect)", variable=self.capture_preview
-        ).pack(anchor=tk.W)
-        self.capture_preview_label = ttk.Label(preview_frame)
-        self.capture_preview_label.pack(anchor=tk.W, pady=4)
+        action_frame = ttk.Frame(frame)
+        action_frame.grid(row=0, column=0, columnspan=3, sticky=tk.W, padx=8, pady=8)
 
         def run_capture() -> None:
             try:
@@ -265,9 +235,58 @@ class App:
             )
             self._log("Capture dataset ready.")
 
-        ttk.Button(frame, text="Start Capture", command=lambda: self._run_task("capture", run_capture)).grid(
-            row=11, column=0, padx=8, pady=8, sticky=tk.W
+        self.capture_button = ttk.Button(
+            action_frame,
+            text="● Start Capture",
+            command=lambda: self._run_task("capture", run_capture),
         )
+        self.capture_button.pack(anchor=tk.W)
+
+        self._path_row(frame, "Output", self.capture_output, 1, is_dir=True)
+        self._entry_row(frame, "Frames", self.capture_frames, 2)
+        self._entry_row(frame, "FPS", self.capture_fps, 3)
+        self._entry_row(frame, "Warmup", self.capture_warmup, 4)
+        self._entry_row(frame, "Mode", self.capture_mode, 5)
+        self._entry_row(frame, "Change Threshold (m)", self.capture_change, 6)
+        self._entry_row(frame, "Max Frames Total", self.capture_max_total, 7)
+        self._entry_row(frame, "Depth Min (m)", self.capture_depth_min, 8)
+        self._entry_row(frame, "Depth Max (m)", self.capture_depth_max, 9)
+
+        mask_frame = ttk.Frame(frame)
+        mask_frame.grid(row=10, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
+        ttk.Checkbutton(mask_frame, text="Mask Background", variable=self.capture_mask).pack(
+            anchor=tk.W
+        )
+        ttk.Checkbutton(mask_frame, text="Auto-stop", variable=self.capture_auto_stop).pack(
+            anchor=tk.W
+        )
+
+        self._entry_row(frame, "Auto-stop Patience", self.capture_auto_patience, 11)
+        self._entry_row(frame, "Auto-stop Delta (m)", self.capture_auto_delta, 12)
+        self._entry_row(frame, "ROI x,y,w,h", self.capture_roi, 13)
+        self._entry_row(frame, "HSV Lower h,s,v", self.capture_hsv_lower, 14)
+        self._entry_row(frame, "HSV Upper h,s,v", self.capture_hsv_upper, 15)
+
+        color_frame = ttk.Frame(frame)
+        color_frame.grid(row=16, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
+        ttk.Checkbutton(
+            color_frame, text="Enable Color Mask", variable=self.capture_color_mask
+        ).pack(anchor=tk.W)
+
+        self._entry_row(frame, "Turntable Preset (vxb-8)", self.capture_turntable_preset, 17)
+        self._entry_row(frame, "Turntable Model", self.capture_turntable_model, 18)
+        self._entry_row(frame, "Turntable Diameter (mm)", self.capture_turntable_diameter, 19)
+        self._entry_row(frame, "Rotation Period (s)", self.capture_turntable_rotation, 20)
+
+        self._path_row(frame, "Intrinsics JSON", self.capture_intrinsics, 21, is_dir=False)
+
+        preview_frame = ttk.Frame(frame)
+        preview_frame.grid(row=22, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
+        ttk.Checkbutton(
+            preview_frame, text="Live Preview (Kinect)", variable=self.capture_preview
+        ).pack(anchor=tk.W)
+        self.capture_preview_label = ttk.Label(preview_frame)
+        self.capture_preview_label.pack(anchor=tk.W, pady=4)
 
     @staticmethod
     def _to_ppm_bytes(color: np.ndarray, max_width: int = 480) -> bytes:
@@ -299,6 +318,8 @@ class App:
                 self.view_dataset_path.set(capture_root)
             if not self.recon_input.get():
                 self.recon_input.set(capture_root)
+            if self.recon_output.get() in {"", "model.ply"}:
+                self.recon_output.set(str(Path(capture_root) / "model.ply"))
             self.view_button.state(["!disabled"])
             self.recon_button.state(["!disabled"])
         else:
@@ -361,6 +382,17 @@ class App:
         def run_reconstruct() -> None:
             if not self._require_dataset(self.recon_input.get(), "reconstruct"):
                 return
+            output_text = self.recon_output.get().strip()
+            if not output_text:
+                self._log("[reconstruct] error: output mesh path is empty")
+                return
+            output_path = Path(output_text)
+            if output_path.exists() and output_path.is_dir():
+                output_path = output_path / "model.ply"
+                self.recon_output.set(str(output_path))
+            if output_path.suffix == "":
+                output_path = output_path.with_suffix(".ply")
+                self.recon_output.set(str(output_path))
             config = ReconstructionConfig(
                 voxel_length=self.recon_voxel.get(),
                 sdf_trunc=self.recon_sdf.get(),
@@ -375,7 +407,7 @@ class App:
                 fill_hole_radius=self.recon_fill.get(),
                 preset=self.recon_preset.get(),
             )
-            reconstruct_mesh(Path(self.recon_input.get()), Path(self.recon_output.get()), config)
+            reconstruct_mesh(Path(self.recon_input.get()), output_path, config)
 
         self.recon_button = ttk.Button(
             frame,
@@ -397,6 +429,8 @@ class App:
         self._path_row(frame, "Mesh", self.measure_mesh_path, 0, is_dir=False)
 
         def run_measure() -> None:
+            if not self._require_mesh(self.measure_mesh_path.get(), "measure"):
+                return
             measurements = measure_mesh(Path(self.measure_mesh_path.get()))
             self._log(
                 "Axis-aligned (m): "
