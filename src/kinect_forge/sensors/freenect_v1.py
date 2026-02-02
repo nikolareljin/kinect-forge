@@ -54,6 +54,29 @@ def probe_device() -> bool:
         sensor = FreenectV1Sensor()
     except RuntimeError:
         return False
+
+
+def set_tilt_degs(angle: float, index: int = 0) -> None:
+    try:
+        import freenect  # type: ignore
+    except ImportError as exc:
+        raise RuntimeError("freenect not available for tilt control.") from exc
+
+    if hasattr(freenect, "sync_set_tilt_degs"):
+        freenect.sync_set_tilt_degs(float(angle), index=index)
+        return
+
+    ctx = freenect.init()
+    if ctx is None:
+        raise RuntimeError("Failed to init freenect context for tilt.")
+    try:
+        dev = freenect.open_device(ctx, index)
+        if dev is None:
+            raise RuntimeError("Failed to open freenect device for tilt.")
+        freenect.set_tilt_degs(dev, float(angle))
+        freenect.close_device(dev)
+    finally:
+        freenect.shutdown(ctx)
     try:
         _ = sensor.get_frame()
         return True

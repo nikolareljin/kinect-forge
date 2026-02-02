@@ -18,7 +18,7 @@ from kinect_forge.config import CaptureConfig, KinectIntrinsics, ReconstructionC
 from kinect_forge.measure import measure_mesh
 from kinect_forge.presets import capture_preset, reconstruction_preset
 from kinect_forge.reconstruct import reconstruct_mesh
-from kinect_forge.sensors.freenect_v1 import FreenectV1Sensor, probe_device
+from kinect_forge.sensors.freenect_v1 import FreenectV1Sensor, probe_device, set_tilt_degs
 from kinect_forge.turntable import get_turntable_preset
 from kinect_forge.viewer import view_dataset, view_mesh
 
@@ -145,6 +145,7 @@ class App:
         self.capture_intrinsics = tk.StringVar(value="")
         self.capture_preview = tk.BooleanVar(value=True)
         self.capture_profile = tk.StringVar(value="")
+        self.capture_tilt = tk.DoubleVar(value=0.0)
 
         action_frame = ttk.Frame(frame)
         action_frame.grid(row=0, column=0, columnspan=3, sticky=tk.W, padx=8, pady=8)
@@ -256,6 +257,30 @@ class App:
             command=lambda: self._run_task("capture", run_capture),
         )
         self.capture_button.pack(anchor=tk.W)
+
+        tilt_frame = ttk.Frame(action_frame)
+        tilt_frame.pack(anchor=tk.W, pady=4)
+        ttk.Label(tilt_frame, text="Tilt (deg):").pack(side=tk.LEFT)
+        ttk.Entry(tilt_frame, textvariable=self.capture_tilt, width=6).pack(
+            side=tk.LEFT, padx=4
+        )
+
+        def tilt_to(angle: float) -> None:
+            try:
+                set_tilt_degs(angle)
+                self._log(f"Tilt set to {angle} degrees.")
+            except Exception as exc:  # pragma: no cover
+                self._log(f"Tilt failed: {exc}")
+
+        ttk.Button(tilt_frame, text="Set", command=lambda: tilt_to(self.capture_tilt.get())).pack(
+            side=tk.LEFT, padx=4
+        )
+        ttk.Button(tilt_frame, text="Up", command=lambda: tilt_to(min(30.0, self.capture_tilt.get() + 5.0))).pack(
+            side=tk.LEFT
+        )
+        ttk.Button(tilt_frame, text="Down", command=lambda: tilt_to(max(-30.0, self.capture_tilt.get() - 5.0))).pack(
+            side=tk.LEFT, padx=4
+        )
 
         self._entry_row(frame, "Capture Preset (small-object|face-scan)", self.capture_profile, 1)
         self._path_row(frame, "Output", self.capture_output, 2, is_dir=True)

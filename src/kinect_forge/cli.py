@@ -14,7 +14,7 @@ from kinect_forge.config import KinectIntrinsics
 from kinect_forge.measure import measure_mesh
 from kinect_forge.presets import capture_preset, reconstruction_preset
 from kinect_forge.reconstruct import reconstruct_mesh
-from kinect_forge.sensors.freenect_v1 import FreenectV1Sensor, probe_device
+from kinect_forge.sensors.freenect_v1 import FreenectV1Sensor, probe_device, set_tilt_degs
 from kinect_forge.viewer import view_dataset, view_mesh
 from kinect_forge.turntable import get_turntable_preset
 
@@ -45,6 +45,18 @@ def status() -> None:
             "Kinect v1 backend not detected. Ensure libfreenect and python3-freenect "
             "are installed and the device is connected."
         )
+
+
+@app.command()
+def tilt(
+    angle: float = typer.Option(0.0, help="Tilt angle in degrees (-30..30)"),
+    index: int = typer.Option(0, help="Kinect device index"),
+) -> None:
+    """Set Kinect v1 tilt angle (up/down only)."""
+    if angle < -30 or angle > 30:
+        raise typer.BadParameter("angle must be between -30 and 30 degrees")
+    set_tilt_degs(angle, index=index)
+    console.print(f"Tilt set to {angle} degrees.")
 
 
 @app.command()
