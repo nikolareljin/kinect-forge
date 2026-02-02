@@ -31,6 +31,6 @@ fi
 source "$VENV_DIR/bin/activate"
 
 python -m pip install --upgrade pip
-python -m pip install -e "$ROOT_DIR".[dev]
+python -m pip install -e "${ROOT_DIR}[dev]"
 
 echo "Setup complete. Activate with: source $VENV_DIR/bin/activate"
