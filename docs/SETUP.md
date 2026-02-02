@@ -101,6 +101,12 @@ Kinect v1 supports tilt up/down (no left/right). Use:
 python -m kinect_forge tilt --angle 10
 ```
 
+Tilt sweep during capture (CLI):
+```bash
+python -m kinect_forge capture --capture-preset face-scan --tilt-sweep \
+  --tilt-min -10 --tilt-max 10 --tilt-step 5 --tilt-hold-frames 30
+```
+
 Kinect live feed test (dev tool):
 ```bash
 ./scripts/test_kinect.sh --list
