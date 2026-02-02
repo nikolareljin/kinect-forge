@@ -146,6 +146,11 @@ class App:
         self.capture_preview = tk.BooleanVar(value=True)
         self.capture_profile = tk.StringVar(value="")
         self.capture_tilt = tk.DoubleVar(value=0.0)
+        self.capture_tilt_sweep = tk.BooleanVar(value=False)
+        self.capture_tilt_min = tk.DoubleVar(value=-10.0)
+        self.capture_tilt_max = tk.DoubleVar(value=10.0)
+        self.capture_tilt_step = tk.DoubleVar(value=5.0)
+        self.capture_tilt_hold = tk.IntVar(value=30)
 
         action_frame = ttk.Frame(frame)
         action_frame.grid(row=0, column=0, columnspan=3, sticky=tk.W, padx=8, pady=8)
@@ -168,6 +173,16 @@ class App:
                     self.capture_auto_stop.set(profile["auto_stop"])
                     self.capture_auto_patience.set(profile["auto_stop_patience"])
                     self.capture_auto_delta.set(profile["auto_stop_delta"])
+                    if "tilt_sweep" in profile:
+                        self.capture_tilt_sweep.set(bool(profile["tilt_sweep"]))
+                    if "tilt_min" in profile:
+                        self.capture_tilt_min.set(float(profile["tilt_min"]))
+                    if "tilt_max" in profile:
+                        self.capture_tilt_max.set(float(profile["tilt_max"]))
+                    if "tilt_step" in profile:
+                        self.capture_tilt_step.set(float(profile["tilt_step"]))
+                    if "tilt_hold_frames" in profile:
+                        self.capture_tilt_hold.set(int(profile["tilt_hold_frames"]))
                 except Exception as exc:  # pragma: no cover
                     self._log(f"Capture preset error: {exc}")
 
@@ -191,6 +206,11 @@ class App:
                 color_mask=self.capture_color_mask.get(),
                 hsv_lower=(0, 0, 0),
                 hsv_upper=(179, 255, 255),
+                tilt_sweep=self.capture_tilt_sweep.get(),
+                tilt_min=self.capture_tilt_min.get(),
+                tilt_max=self.capture_tilt_max.get(),
+                tilt_step=self.capture_tilt_step.get(),
+                tilt_hold_frames=self.capture_tilt_hold.get(),
                 turntable_model=self.capture_turntable_model.get() or None,
                 turntable_diameter_mm=int(self.capture_turntable_diameter.get())
                 if self.capture_turntable_diameter.get()
@@ -281,6 +301,20 @@ class App:
         ttk.Button(tilt_frame, text="Down", command=lambda: tilt_to(max(-30.0, self.capture_tilt.get() - 5.0))).pack(
             side=tk.LEFT, padx=4
         )
+
+        sweep_frame = ttk.Frame(action_frame)
+        sweep_frame.pack(anchor=tk.W, pady=4)
+        ttk.Checkbutton(
+            sweep_frame, text="Tilt Sweep", variable=self.capture_tilt_sweep
+        ).pack(side=tk.LEFT)
+        ttk.Label(sweep_frame, text="Min").pack(side=tk.LEFT, padx=4)
+        ttk.Entry(sweep_frame, textvariable=self.capture_tilt_min, width=5).pack(side=tk.LEFT)
+        ttk.Label(sweep_frame, text="Max").pack(side=tk.LEFT, padx=4)
+        ttk.Entry(sweep_frame, textvariable=self.capture_tilt_max, width=5).pack(side=tk.LEFT)
+        ttk.Label(sweep_frame, text="Step").pack(side=tk.LEFT, padx=4)
+        ttk.Entry(sweep_frame, textvariable=self.capture_tilt_step, width=5).pack(side=tk.LEFT)
+        ttk.Label(sweep_frame, text="Hold").pack(side=tk.LEFT, padx=4)
+        ttk.Entry(sweep_frame, textvariable=self.capture_tilt_hold, width=5).pack(side=tk.LEFT)
 
         self._entry_row(frame, "Capture Preset (small-object|face-scan)", self.capture_profile, 1)
         self._path_row(frame, "Output", self.capture_output, 2, is_dir=True)

@@ -100,6 +100,11 @@ def capture(
     capture_preset_name: Optional[str] = typer.Option(
         None, "--capture-preset", help="Capture preset: small-object|face-scan"
     ),
+    tilt_sweep: bool = typer.Option(False, help="Enable tilt sweep during capture"),
+    tilt_min: float = typer.Option(-10.0, help="Tilt sweep min angle (deg)"),
+    tilt_max: float = typer.Option(10.0, help="Tilt sweep max angle (deg)"),
+    tilt_step: float = typer.Option(5.0, help="Tilt sweep step (deg)"),
+    tilt_hold_frames: int = typer.Option(30, help="Frames to hold before next tilt"),
 ) -> None:
     """Capture RGB-D frames using Kinect v1 (libfreenect)."""
     if capture_preset_name:
@@ -162,7 +167,21 @@ def capture(
     if intrinsics_path is not None:
         payload = json.loads(intrinsics_path.read_text())
         intrinsics = KinectIntrinsics.from_dict(payload)
-    capture_frames(sensor, output, config, intrinsics=intrinsics)
+    config = CaptureConfig(
+        **{
+            **config.__dict__,
+            "tilt_sweep": tilt_sweep,
+            "tilt_min": tilt_min,
+            "tilt_max": tilt_max,
+            "tilt_step": tilt_step,
+            "tilt_hold_frames": tilt_hold_frames,
+        }
+    )
+
+    def tilt_cb(angle: float) -> None:
+        set_tilt_degs(angle)
+
+    capture_frames(sensor, output, config, intrinsics=intrinsics, tilt_cb=tilt_cb if tilt_sweep else None)
     console.print(f"Capture complete: {frames} frames saved to {output}")
 
 

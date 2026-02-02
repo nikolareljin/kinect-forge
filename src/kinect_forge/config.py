@@ -51,6 +51,11 @@ class CaptureConfig:
     color_mask: bool = False
     hsv_lower: tuple[int, int, int] = (0, 0, 0)
     hsv_upper: tuple[int, int, int] = (179, 255, 255)
+    tilt_sweep: bool = False
+    tilt_min: float = -10.0
+    tilt_max: float = 10.0
+    tilt_step: float = 5.0
+    tilt_hold_frames: int = 30
     turntable_model: Optional[str] = None
     turntable_diameter_mm: Optional[int] = None
     turntable_rotation_seconds: Optional[float] = None

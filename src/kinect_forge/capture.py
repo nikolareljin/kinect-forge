@@ -80,6 +80,7 @@ def capture_frames(
     config: CaptureConfig,
     intrinsics: Optional[KinectIntrinsics] = None,
     preview_cb: Optional[Callable[[np.ndarray, np.ndarray], None]] = None,
+    tilt_cb: Optional[Callable[[float], None]] = None,
 ) -> None:
     if config.mode not in {"standard", "turntable"}:
         raise ValueError("mode must be 'standard' or 'turntable'")
@@ -108,6 +109,11 @@ def capture_frames(
         total = 0
         last_saved_depth: Optional[np.ndarray] = None
         stagnant = 0
+        tilt_angle = config.tilt_min
+        tilt_dir = 1.0
+        next_tilt_at = config.tilt_hold_frames
+        if config.tilt_sweep and tilt_cb is not None:
+            tilt_cb(tilt_angle)
         while saved < config.frames and total < config.max_frames_total:
             total += 1
             frame = sensor.get_frame()
@@ -143,6 +149,16 @@ def capture_frames(
                 last_saved_depth = depth
                 saved += 1
                 stagnant = 0
+                if config.tilt_sweep and tilt_cb is not None and saved >= next_tilt_at:
+                    tilt_angle += tilt_dir * config.tilt_step
+                    if tilt_angle > config.tilt_max:
+                        tilt_angle = config.tilt_max
+                        tilt_dir = -1.0
+                    elif tilt_angle < config.tilt_min:
+                        tilt_angle = config.tilt_min
+                        tilt_dir = 1.0
+                    tilt_cb(tilt_angle)
+                    next_tilt_at = saved + max(1, config.tilt_hold_frames)
             elif config.auto_stop and config.mode == "turntable":
                 if last_saved_depth is not None:
                     depth_m = depth.astype(np.float32) / config.depth_scale
