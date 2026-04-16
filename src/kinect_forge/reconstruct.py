@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, cast
 
 import numpy as np
 import open3d as o3d
@@ -213,6 +213,10 @@ def _interpolate_rigid_transform(transform: np.ndarray, alpha: float) -> np.ndar
     return correction
 
 
+def _loop_closure_residual(last_pose: np.ndarray, last_to_first: np.ndarray) -> np.ndarray:
+    return cast(np.ndarray, last_pose @ last_to_first)
+
+
 def _apply_loop_closure(
     poses: List[np.ndarray],
     rgbd_images: List[o3d.geometry.RGBDImage],
@@ -242,8 +246,8 @@ def _apply_loop_closure(
         o3d.pipelines.registration.TransformationEstimationPointToPlane(),
         criteria,
     )
-    # loop_error: how far the final composed pose deviates from a perfect loop
-    loop_error = poses[-1] @ np.linalg.inv(result.transformation)
+    # A perfect loop satisfies poses[-1] @ (last -> first) == I.
+    loop_error = _loop_closure_residual(poses[-1], result.transformation)
     inv_error = np.linalg.inv(loop_error)
 
     corrected: List[np.ndarray] = []
