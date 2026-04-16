@@ -25,6 +25,15 @@ class FreenectV1Sensor:
             ) from exc
         self._freenect = freenect
 
+    @property
+    def depth_scale(self) -> float:
+        """Scale factor converting raw depth values to metres.
+
+        DEPTH_MM values are in millimetres (scale = 1000.0).
+        DEPTH_11BIT values are raw sensor units and require separate calibration.
+        """
+        return 1000.0 if self._config.depth_format != "11bit" else 1.0
+
     def start(self) -> None:
         return None
 
@@ -54,6 +63,11 @@ def probe_device() -> bool:
         sensor = FreenectV1Sensor()
     except RuntimeError:
         return False
+    try:
+        _ = sensor.get_frame()
+        return True
+    except RuntimeError:
+        return False
 
 
 def set_tilt_degs(angle: float, index: int = 0) -> None:
@@ -77,8 +91,3 @@ def set_tilt_degs(angle: float, index: int = 0) -> None:
         freenect.close_device(dev)
     finally:
         freenect.shutdown(ctx)
-    try:
-        _ = sensor.get_frame()
-        return True
-    except RuntimeError:
-        return False

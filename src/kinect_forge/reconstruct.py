@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
-from typing import List, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import numpy as np
 import open3d as o3d
@@ -112,9 +113,7 @@ def _refine_poses_icp(
 ) -> List[np.ndarray]:
     refined: List[np.ndarray] = [poses[0]]
     pcd_prev = _rgbd_to_pcd(rgbd_images[0], intrinsic, icp_voxel)
-    criteria = o3d.pipelines.registration.ICPConvergenceCriteria(
-        max_iteration=icp_iterations
-    )
+    criteria = o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=icp_iterations)
     for idx in range(1, len(rgbd_images)):
         pcd = _rgbd_to_pcd(rgbd_images[idx], intrinsic, icp_voxel)
         initial = np.linalg.inv(poses[idx - 1]) @ poses[idx]
@@ -132,7 +131,50 @@ def _refine_poses_icp(
     return refined
 
 
-def _clean_mesh(mesh: o3d.geometry.TriangleMesh, config: ReconstructionConfig) -> o3d.geometry.TriangleMesh:
+def _estimate_turntable_poses(
+    rgbd_images: List[o3d.geometry.RGBDImage],
+    intrinsic: o3d.camera.PinholeCameraIntrinsic,
+    icp_distance: float,
+    icp_voxel: float,
+    icp_iterations: int,
+) -> List[np.ndarray]:
+    """Estimate poses for a turntable dataset using rotation-prior ICP.
+
+    Each frame is registered against frame 0 using a Y-axis rotation initial
+    guess computed from the frame index. This avoids drift from sequential
+    odometry and handles the known-axis rotation of a turntable.
+    """
+    n = len(rgbd_images)
+    poses: List[np.ndarray] = [np.eye(4)]
+    pcd_ref = _rgbd_to_pcd(rgbd_images[0], intrinsic, icp_voxel)
+    criteria = o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=icp_iterations)
+    for i in range(1, n):
+        angle = 2.0 * np.pi * i / n
+        c, s = float(np.cos(angle)), float(np.sin(angle))
+        initial = np.array(
+            [
+                [c, 0.0, s, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [-s, 0.0, c, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]
+        )
+        pcd = _rgbd_to_pcd(rgbd_images[i], intrinsic, icp_voxel)
+        result = o3d.pipelines.registration.registration_icp(
+            pcd,
+            pcd_ref,
+            icp_distance,
+            initial,
+            o3d.pipelines.registration.TransformationEstimationPointToPlane(),
+            criteria,
+        )
+        poses.append(result.transformation)
+    return poses
+
+
+def _clean_mesh(
+    mesh: o3d.geometry.TriangleMesh, config: ReconstructionConfig
+) -> o3d.geometry.TriangleMesh:
     mesh.remove_degenerate_triangles()
     mesh.remove_duplicated_triangles()
     mesh.remove_duplicated_vertices()
@@ -146,7 +188,12 @@ def _clean_mesh(mesh: o3d.geometry.TriangleMesh, config: ReconstructionConfig) -
     return mesh
 
 
-def reconstruct_mesh(input_dir: Path, output_mesh: Path, config: ReconstructionConfig) -> None:
+def reconstruct_mesh(
+    input_dir: Path,
+    output_mesh: Path,
+    config: ReconstructionConfig,
+    progress_callback: Optional[Callable[[int, int], None]] = None,
+) -> None:
     meta = load_metadata(input_dir)
     pairs = list_frame_pairs(input_dir)
     if not pairs:
@@ -154,6 +201,14 @@ def reconstruct_mesh(input_dir: Path, output_mesh: Path, config: ReconstructionC
 
     depth_scale = config.depth_scale if config.depth_scale > 0 else meta.depth_scale
     depth_trunc = config.depth_trunc if config.depth_trunc > 0 else meta.depth_trunc
+
+    if meta.depth_format == "11bit" and depth_scale >= 999.0:
+        warnings.warn(
+            "Dataset captured with DEPTH_11BIT but depth_scale=1000.0. "
+            "Metric scale will be incorrect. Recapture using DEPTH_MM (default).",
+            stacklevel=2,
+        )
+
     pairs = _select_keyframes(pairs, depth_scale, config.keyframe_threshold)
     if not pairs:
         raise RuntimeError("Keyframe selection removed all frames.")
@@ -169,20 +224,28 @@ def reconstruct_mesh(input_dir: Path, output_mesh: Path, config: ReconstructionC
     )
 
     rgbd_images = [
-        _rgbd_from_paths(color, depth, depth_scale, depth_trunc)
-        for color, depth in pairs
+        _rgbd_from_paths(color, depth, depth_scale, depth_trunc) for color, depth in pairs
     ]
 
-    poses = _estimate_poses(rgbd_images, intrinsic)
-    if config.icp_refine and len(rgbd_images) > 1:
-        poses = _refine_poses_icp(
+    if meta.turntable_rotation_seconds is not None:
+        poses = _estimate_turntable_poses(
             rgbd_images,
             intrinsic,
-            poses,
             config.icp_distance,
             config.icp_voxel,
             config.icp_iterations,
         )
+    else:
+        poses = _estimate_poses(rgbd_images, intrinsic)
+        if config.icp_refine and len(rgbd_images) > 1:
+            poses = _refine_poses_icp(
+                rgbd_images,
+                intrinsic,
+                poses,
+                config.icp_distance,
+                config.icp_voxel,
+                config.icp_iterations,
+            )
 
     volume = o3d.pipelines.integration.ScalableTSDFVolume(
         voxel_length=config.voxel_length,
@@ -190,8 +253,11 @@ def reconstruct_mesh(input_dir: Path, output_mesh: Path, config: ReconstructionC
         color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8,
     )
 
-    for rgbd, pose in zip(rgbd_images, poses):
+    total_frames = len(rgbd_images)
+    for idx, (rgbd, pose) in enumerate(zip(rgbd_images, poses)):
         volume.integrate(rgbd, intrinsic, np.linalg.inv(pose))
+        if progress_callback is not None:
+            progress_callback(idx + 1, total_frames)
 
     mesh = volume.extract_triangle_mesh()
     mesh = _clean_mesh(mesh, config)

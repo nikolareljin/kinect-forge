@@ -37,6 +37,9 @@ class App:
         self.log_text = tk.Text(self.root, height=8, wrap=tk.WORD)
         self.log_text.pack(fill=tk.BOTH, expand=False)
 
+        self._calib_status = tk.StringVar(value="")
+        self._recon_progress_text = tk.StringVar(value="")
+
         self._build_status_tab()
         self._build_capture_tab()
         self._build_reconstruct_tab()
@@ -44,6 +47,7 @@ class App:
         self._build_view_tab()
         self._build_calibrate_tab()
         self.root.after(500, self._refresh_dataset_state)
+        self._refresh_calib_status()
 
     def _log(self, message: str) -> None:
         self.log_text.insert(tk.END, message + "\n")
@@ -85,6 +89,18 @@ class App:
 
         threading.Thread(target=runner, daemon=True).start()
 
+    def _refresh_calib_status(self) -> None:
+        from pathlib import Path as _Path
+
+        if (_Path.cwd() / "calibration.json").is_file():
+            self._calib_status.set("Calibration: loaded from calibration.json")
+        else:
+            self._calib_status.set("Calibration: using Kinect v1 defaults")
+
+    def _update_recon_progress(self, current: int, total: int, pct: int) -> None:
+        self._recon_progress_bar["value"] = pct
+        self._recon_progress_text.set(f"Frame {current} / {total}")
+
     def _build_status_tab(self) -> None:
         frame = ttk.Frame(self.notebook)
         self.notebook.add(frame, text="Status")
@@ -109,13 +125,11 @@ class App:
             if ok:
                 self._log("Kinect v1 backend detected and streaming.")
             else:
-                self._log(
-                    "Kinect v1 backend not detected. Install libfreenect + python3-freenect."
-                )
+                self._log("Kinect v1 backend not detected. Install libfreenect + python3-freenect.")
 
-        ttk.Button(frame, text="Check Status", command=lambda: self._run_task("status", check)).pack(
-            anchor=tk.W, padx=8, pady=4
-        )
+        ttk.Button(
+            frame, text="Check Status", command=lambda: self._run_task("status", check)
+        ).pack(anchor=tk.W, padx=8, pady=4)
 
     def _build_capture_tab(self) -> None:
         frame = ttk.Frame(self.notebook)
@@ -281,9 +295,7 @@ class App:
         tilt_frame = ttk.Frame(action_frame)
         tilt_frame.pack(anchor=tk.W, pady=4)
         ttk.Label(tilt_frame, text="Tilt (deg):").pack(side=tk.LEFT)
-        ttk.Entry(tilt_frame, textvariable=self.capture_tilt, width=6).pack(
-            side=tk.LEFT, padx=4
-        )
+        ttk.Entry(tilt_frame, textvariable=self.capture_tilt, width=6).pack(side=tk.LEFT, padx=4)
 
         def tilt_to(angle: float) -> None:
             try:
@@ -295,18 +307,20 @@ class App:
         ttk.Button(tilt_frame, text="Set", command=lambda: tilt_to(self.capture_tilt.get())).pack(
             side=tk.LEFT, padx=4
         )
-        ttk.Button(tilt_frame, text="Up", command=lambda: tilt_to(min(30.0, self.capture_tilt.get() + 5.0))).pack(
-            side=tk.LEFT
-        )
-        ttk.Button(tilt_frame, text="Down", command=lambda: tilt_to(max(-30.0, self.capture_tilt.get() - 5.0))).pack(
-            side=tk.LEFT, padx=4
-        )
+        ttk.Button(
+            tilt_frame, text="Up", command=lambda: tilt_to(min(30.0, self.capture_tilt.get() + 5.0))
+        ).pack(side=tk.LEFT)
+        ttk.Button(
+            tilt_frame,
+            text="Down",
+            command=lambda: tilt_to(max(-30.0, self.capture_tilt.get() - 5.0)),
+        ).pack(side=tk.LEFT, padx=4)
 
         sweep_frame = ttk.Frame(action_frame)
         sweep_frame.pack(anchor=tk.W, pady=4)
-        ttk.Checkbutton(
-            sweep_frame, text="Tilt Sweep", variable=self.capture_tilt_sweep
-        ).pack(side=tk.LEFT)
+        ttk.Checkbutton(sweep_frame, text="Tilt Sweep", variable=self.capture_tilt_sweep).pack(
+            side=tk.LEFT
+        )
         ttk.Label(sweep_frame, text="Min").pack(side=tk.LEFT, padx=4)
         ttk.Entry(sweep_frame, textvariable=self.capture_tilt_min, width=5).pack(side=tk.LEFT)
         ttk.Label(sweep_frame, text="Max").pack(side=tk.LEFT, padx=4)
@@ -355,8 +369,12 @@ class App:
 
         self._path_row(frame, "Intrinsics JSON", self.capture_intrinsics, 22, is_dir=False)
 
+        ttk.Label(frame, textvariable=self._calib_status, foreground="gray").grid(
+            row=23, column=0, columnspan=3, sticky=tk.W, padx=8, pady=2
+        )
+
         preview_frame = ttk.Frame(frame)
-        preview_frame.grid(row=23, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
+        preview_frame.grid(row=24, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
         ttk.Checkbutton(
             preview_frame, text="Live Preview (Kinect)", variable=self.capture_preview
         ).pack(anchor=tk.W)
@@ -423,7 +441,9 @@ class App:
 
         self._path_row(frame, "Input Dataset", self.recon_input, 0, is_dir=True)
         self._path_row(frame, "Output Mesh", self.recon_output, 1, is_dir=False, is_save=True)
-        self._entry_row(frame, "Preset (small|medium|large|small-object|face-scan)", self.recon_preset, 2)
+        self._entry_row(
+            frame, "Preset (small|medium|large|small-object|face-scan)", self.recon_preset, 2
+        )
         self._entry_row(frame, "Voxel Length", self.recon_voxel, 3)
         self._entry_row(frame, "SDF Trunc", self.recon_sdf, 4)
         self._entry_row(frame, "Depth Scale", self.recon_depth_scale, 5)
@@ -454,6 +474,14 @@ class App:
             self.recon_smooth.set(preset_cfg.smooth_iterations)
             self.recon_fill.set(preset_cfg.fill_hole_radius)
 
+        self._recon_progress_bar = ttk.Progressbar(
+            frame, mode="determinate", maximum=100, length=300
+        )
+        self._recon_progress_bar.grid(row=14, column=0, columnspan=2, padx=8, pady=4, sticky=tk.W)
+        ttk.Label(frame, textvariable=self._recon_progress_text).grid(
+            row=15, column=0, columnspan=2, padx=8, sticky=tk.W
+        )
+
         def run_reconstruct() -> None:
             if not self._require_dataset(self.recon_input.get(), "reconstruct"):
                 return
@@ -482,18 +510,26 @@ class App:
                 fill_hole_radius=self.recon_fill.get(),
                 preset=self.recon_preset.get(),
             )
-            reconstruct_mesh(Path(self.recon_input.get()), output_path, config)
+            self.root.after(0, self._update_recon_progress, 0, 0, 0)
+
+            def on_progress(current: int, total: int) -> None:
+                pct = int(100 * current / total) if total else 0
+                self.root.after(0, self._update_recon_progress, current, total, pct)
+
+            reconstruct_mesh(
+                Path(self.recon_input.get()), output_path, config, progress_callback=on_progress
+            )
 
         self.recon_button = ttk.Button(
             frame,
             text="Reconstruct",
             command=lambda: self._run_task("reconstruct", run_reconstruct),
         )
-        self.recon_button.grid(row=14, column=0, padx=8, pady=8, sticky=tk.W)
+        self.recon_button.grid(row=16, column=0, padx=8, pady=8, sticky=tk.W)
         self.recon_button.state(["disabled"])
 
         ttk.Button(frame, text="Apply Preset", command=apply_preset).grid(
-            row=14, column=1, padx=8, pady=8, sticky=tk.W
+            row=16, column=1, padx=8, pady=8, sticky=tk.W
         )
 
     def _build_measure_tab(self) -> None:
@@ -522,9 +558,9 @@ class App:
             if measurements.volume is not None:
                 self._log(f"Volume (m^3): {measurements.volume:.6f}")
 
-        ttk.Button(frame, text="Measure", command=lambda: self._run_task("measure", run_measure)).grid(
-            row=1, column=0, padx=8, pady=8, sticky=tk.W
-        )
+        ttk.Button(
+            frame, text="Measure", command=lambda: self._run_task("measure", run_measure)
+        ).grid(row=1, column=0, padx=8, pady=8, sticky=tk.W)
 
     def _build_view_tab(self) -> None:
         frame = ttk.Frame(self.notebook)
@@ -576,6 +612,7 @@ class App:
             save_intrinsics(Path(self.calib_output.get()), intrinsics)
             self._log(f"Intrinsics saved to {self.calib_output.get()}")
             self._log(json.dumps(asdict(intrinsics), indent=2))
+            self.root.after(0, self._refresh_calib_status)
 
         ttk.Button(
             frame, text="Calibrate", command=lambda: self._run_task("calibrate", run_calibrate)

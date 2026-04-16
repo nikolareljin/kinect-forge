@@ -66,9 +66,7 @@ def capture(
     fps: float = typer.Option(30.0, help="Target capture FPS"),
     warmup: int = typer.Option(15, help="Warmup frames before recording"),
     mode: str = typer.Option("standard", help="Capture mode: standard|turntable"),
-    change_threshold: float = typer.Option(
-        0.01, help="Turntable depth change threshold (meters)"
-    ),
+    change_threshold: float = typer.Option(0.01, help="Turntable depth change threshold (meters)"),
     max_frames_total: int = typer.Option(
         3000, help="Hard stop for total frames read in turntable mode"
     ),
@@ -78,19 +76,13 @@ def capture(
     auto_stop: bool = typer.Option(False, help="Auto-stop turntable capture"),
     auto_stop_patience: int = typer.Option(30, help="Auto-stop patience frames"),
     auto_stop_delta: float = typer.Option(0.002, help="Auto-stop delta threshold (m)"),
-    roi: Optional[str] = typer.Option(
-        None, help="ROI as x,y,w,h (pixels). Empty disables ROI."
-    ),
+    roi: Optional[str] = typer.Option(None, help="ROI as x,y,w,h (pixels). Empty disables ROI."),
     color_mask: bool = typer.Option(False, help="Enable HSV color masking"),
     hsv_lower: Optional[str] = typer.Option(None, help="HSV lower bound h,s,v"),
     hsv_upper: Optional[str] = typer.Option(None, help="HSV upper bound h,s,v"),
-    turntable_preset: Optional[str] = typer.Option(
-        None, help="Turntable preset: vxb-8"
-    ),
+    turntable_preset: Optional[str] = typer.Option(None, help="Turntable preset: vxb-8"),
     turntable_model: Optional[str] = typer.Option(None, help="Turntable model name"),
-    turntable_diameter_mm: Optional[int] = typer.Option(
-        None, help="Turntable diameter in mm"
-    ),
+    turntable_diameter_mm: Optional[int] = typer.Option(None, help="Turntable diameter in mm"),
     turntable_rotation_seconds: Optional[float] = typer.Option(
         None, help="Turntable rotation period in seconds"
     ),
@@ -155,7 +147,13 @@ def capture(
     roi_tuple = _parse_tuple(roi, 4, "roi")
     if roi_tuple is not None:
         config = CaptureConfig(
-            **{**config.__dict__, "roi_x": roi_tuple[0], "roi_y": roi_tuple[1], "roi_w": roi_tuple[2], "roi_h": roi_tuple[3]}
+            **{
+                **config.__dict__,
+                "roi_x": roi_tuple[0],
+                "roi_y": roi_tuple[1],
+                "roi_w": roi_tuple[2],
+                "roi_h": roi_tuple[3],
+            }
         )
     lower = _parse_tuple(hsv_lower, 3, "hsv-lower")
     upper = _parse_tuple(hsv_upper, 3, "hsv-upper")
@@ -181,7 +179,9 @@ def capture(
     def tilt_cb(angle: float) -> None:
         set_tilt_degs(angle)
 
-    capture_frames(sensor, output, config, intrinsics=intrinsics, tilt_cb=tilt_cb if tilt_sweep else None)
+    capture_frames(
+        sensor, output, config, intrinsics=intrinsics, tilt_cb=tilt_cb if tilt_sweep else None
+    )
     console.print(f"Capture complete: {frames} frames saved to {output}")
 
 
@@ -203,15 +203,11 @@ def reconstruct(
     icp: Optional[bool] = typer.Option(
         None, "--icp/--no-icp", help="Enable/disable ICP refinement"
     ),
-    icp_distance: Optional[float] = typer.Option(
-        None, help="ICP max correspondence distance"
-    ),
+    icp_distance: Optional[float] = typer.Option(None, help="ICP max correspondence distance"),
     icp_voxel: Optional[float] = typer.Option(None, help="ICP voxel downsample size"),
     icp_iterations: Optional[int] = typer.Option(None, help="ICP max iterations"),
     smooth: Optional[int] = typer.Option(None, help="Mesh smoothing iterations"),
-    fill_hole_radius: Optional[float] = typer.Option(
-        None, help="Fill holes radius (meters)"
-    ),
+    fill_hole_radius: Optional[float] = typer.Option(None, help="Fill holes radius (meters)"),
 ) -> None:
     """Reconstruct a mesh from captured frames."""
     config = reconstruction_preset(preset)
@@ -229,9 +225,7 @@ def reconstruct(
         icp_voxel=config.icp_voxel if icp_voxel is None else icp_voxel,
         icp_iterations=config.icp_iterations if icp_iterations is None else icp_iterations,
         smooth_iterations=config.smooth_iterations if smooth is None else smooth,
-        fill_hole_radius=config.fill_hole_radius
-        if fill_hole_radius is None
-        else fill_hole_radius,
+        fill_hole_radius=config.fill_hole_radius if fill_hole_radius is None else fill_hole_radius,
         preset=config.preset,
     )
     reconstruct_mesh(input_dir, output_mesh, config)

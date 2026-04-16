@@ -1,7 +1,24 @@
 # Changelog
 
 ## Unreleased
-- Added turntable presets and capture metadata fields for turntable settings.
+
+## 0.2.0 - 2026-04-15
+### Fixed
+- `probe_device` dead code: orphaned `try/except` block inside `set_tilt_degs` moved
+  into `probe_device` where it belongs; function now returns `True` on success (KF-001).
+- `depth_format` stored in `metadata.json` at capture time; `reconstruct_mesh` warns
+  when a `DEPTH_11BIT` dataset is loaded with `depth_scale=1000.0` (KF-007).
+### Added
+- `calibration.json` in the working directory is auto-loaded as default intrinsics
+  when no explicit `--intrinsics` path is provided (KF-006).
+- Calibration status badge in GUI Capture tab shows which intrinsics are active (KF-006).
+- Turntable rotation-prior ICP pose estimation: for turntable datasets, each frame is
+  registered against frame 0 using a Y-axis rotation initial guess computed from frame
+  index, replacing sequential RGBD odometry that accumulated drift (KF-004).
+- `reconstruct_mesh` accepts an optional `progress_callback(current, total)` parameter
+  called after each frame is integrated into the TSDF volume (KF-008).
+- Progress bar and frame counter in GUI Reconstruct tab (KF-008).
+- Turntable presets and capture metadata fields for turntable settings.
 
 ## 0.1.0 - 2026-01-31
 - Added Kinect v1 capture pipeline with turntable mode, auto-stop, ROI, and HSV masking.

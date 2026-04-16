@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 from typing import Callable, Optional
@@ -11,6 +12,17 @@ import numpy as np
 from kinect_forge.config import CaptureConfig, KinectIntrinsics
 from kinect_forge.dataset import DatasetMeta, ensure_dirs, write_metadata
 from kinect_forge.sensors.base import Sensor
+
+
+def _find_default_calibration() -> Optional[KinectIntrinsics]:
+    """Load calibration.json from cwd if present, return None otherwise."""
+    candidate = Path.cwd() / "calibration.json"
+    if candidate.is_file():
+        try:
+            return KinectIntrinsics.from_dict(json.loads(candidate.read_text()))
+        except Exception:
+            return None
+    return None
 
 
 def _write_color(path: Path, color: np.ndarray) -> None:
@@ -86,11 +98,15 @@ def capture_frames(
         raise ValueError("mode must be 'standard' or 'turntable'")
     output_dir.mkdir(parents=True, exist_ok=True)
     color_dir, depth_dir = ensure_dirs(output_dir)
-    intrinsics = intrinsics or KinectIntrinsics()
+    if intrinsics is None:
+        intrinsics = _find_default_calibration() or KinectIntrinsics()
+    sensor_depth_scale = getattr(sensor, "depth_scale", None)
+    sensor_depth_format = getattr(getattr(sensor, "_config", None), "depth_format", "mm")
     meta = DatasetMeta(
         intrinsics=intrinsics,
-        depth_scale=config.depth_scale,
+        depth_scale=sensor_depth_scale if sensor_depth_scale is not None else config.depth_scale,
         depth_trunc=config.depth_trunc,
+        depth_format=sensor_depth_format,
         turntable_model=config.turntable_model,
         turntable_diameter_mm=config.turntable_diameter_mm,
         turntable_rotation_seconds=config.turntable_rotation_seconds,
@@ -131,9 +147,7 @@ def capture_frames(
                 color, depth, config.roi_x, config.roi_y, config.roi_w, config.roi_h
             )
             if config.color_mask:
-                color, depth = _apply_color_mask(
-                    color, depth, config.hsv_lower, config.hsv_upper
-                )
+                color, depth = _apply_color_mask(color, depth, config.hsv_lower, config.hsv_upper)
             save_frame = True
             if config.mode == "turntable" and last_saved_depth is not None:
                 depth_m = depth.astype(np.float32) / config.depth_scale
