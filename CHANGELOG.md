@@ -18,6 +18,13 @@
 - `reconstruct_mesh` accepts an optional `progress_callback(current, total)` parameter
   called after each frame is integrated into the TSDF volume (KF-008).
 - Progress bar and frame counter in GUI Reconstruct tab (KF-008).
+- Loop closure for standard scanning mode: ICP between last and first frame distributes
+  accumulated drift linearly across all poses; enabled via `loop_closure=True` in
+  `ReconstructionConfig` or the Loop Closure checkbox in the GUI (KF-005).
+- Pipeline tab as the first GUI tab: guided three-step workflow (Capture, Build Model,
+  View) with preset selectors, progress bar, and step status indicators (KF-009).
+- Mesh thumbnail rendered via Open3D offscreen renderer after reconstruction; displayed
+  in the Pipeline tab and View tab automatically (KF-010).
 - Turntable presets and capture metadata fields for turntable settings.
 
 ## 0.1.0 - 2026-01-31

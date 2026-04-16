@@ -131,6 +131,49 @@ def _refine_poses_icp(
     return refined
 
 
+def _apply_loop_closure(
+    poses: List[np.ndarray],
+    rgbd_images: List[o3d.geometry.RGBDImage],
+    intrinsic: o3d.camera.PinholeCameraIntrinsic,
+    icp_distance: float,
+    icp_voxel: float,
+    icp_iterations: int,
+) -> List[np.ndarray]:
+    """Distribute loop closure error linearly across all poses.
+
+    Aligns the last frame back to the first frame via ICP to measure accumulated
+    drift, then spreads the correction evenly across every intermediate pose.
+    Applies only when at least 4 frames are present.
+    """
+    n = len(poses)
+    if n < 4:
+        return poses
+
+    pcd_first = _rgbd_to_pcd(rgbd_images[0], intrinsic, icp_voxel)
+    pcd_last = _rgbd_to_pcd(rgbd_images[-1], intrinsic, icp_voxel)
+    criteria = o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=icp_iterations)
+    result = o3d.pipelines.registration.registration_icp(
+        pcd_last,
+        pcd_first,
+        icp_distance,
+        np.linalg.inv(poses[-1]),
+        o3d.pipelines.registration.TransformationEstimationPointToPlane(),
+        criteria,
+    )
+    # loop_error: how far the final composed pose deviates from a perfect loop
+    loop_error = poses[-1] @ np.linalg.inv(result.transformation)
+    inv_error = np.linalg.inv(loop_error)
+
+    corrected: List[np.ndarray] = []
+    for i, pose in enumerate(poses):
+        alpha = i / (n - 1)
+        # Linearly blend from identity (no correction at frame 0) to inv_error
+        # (full correction at last frame). Valid for small residuals.
+        blend = (1.0 - alpha) * np.eye(4) + alpha * inv_error
+        corrected.append(blend @ pose)
+    return corrected
+
+
 def _estimate_turntable_poses(
     rgbd_images: List[o3d.geometry.RGBDImage],
     intrinsic: o3d.camera.PinholeCameraIntrinsic,
@@ -237,6 +280,15 @@ def reconstruct_mesh(
         )
     else:
         poses = _estimate_poses(rgbd_images, intrinsic)
+        if config.loop_closure and len(rgbd_images) >= 4:
+            poses = _apply_loop_closure(
+                poses,
+                rgbd_images,
+                intrinsic,
+                config.icp_distance,
+                config.icp_voxel,
+                config.icp_iterations,
+            )
         if config.icp_refine and len(rgbd_images) > 1:
             poses = _refine_poses_icp(
                 rgbd_images,

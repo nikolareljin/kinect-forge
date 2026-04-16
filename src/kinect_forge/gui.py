@@ -39,7 +39,11 @@ class App:
 
         self._calib_status = tk.StringVar(value="")
         self._recon_progress_text = tk.StringVar(value="")
+        self._pipeline_step1_status = tk.StringVar(value="pending")
+        self._pipeline_step2_status = tk.StringVar(value="pending")
+        self._thumbnail_image: Optional[tk.PhotoImage] = None
 
+        self._build_pipeline_tab()
         self._build_status_tab()
         self._build_capture_tab()
         self._build_reconstruct_tab()
@@ -100,6 +104,210 @@ class App:
     def _update_recon_progress(self, current: int, total: int, pct: int) -> None:
         self._recon_progress_bar["value"] = pct
         self._recon_progress_text.set(f"Frame {current} / {total}")
+
+    def _render_mesh_thumbnail(self, mesh_path: Path) -> Optional[bytes]:
+        """Render a 400x300 PNG thumbnail of the mesh using Open3D offscreen rendering.
+
+        Returns raw PNG bytes, or None if rendering is unavailable.
+        """
+        try:
+            import open3d as o3d
+
+            renderer = o3d.visualization.rendering.OffscreenRenderer(400, 300)
+            mesh = o3d.io.read_triangle_mesh(str(mesh_path))
+            if mesh.is_empty():
+                return None
+            mesh.compute_vertex_normals()
+            mat = o3d.visualization.rendering.MaterialRecord()
+            mat.shader = "defaultLit"
+            renderer.scene.add_geometry("mesh", mesh, mat)
+            bounds = mesh.get_axis_aligned_bounding_box()
+            renderer.setup_camera(60.0, bounds, bounds.get_center())
+            img = renderer.render_to_image()
+            return o3d.io.write_image_to_memory(img, ".png")
+        except Exception:
+            return None
+
+    def _update_thumbnail(self, mesh_path: str) -> None:
+        if not mesh_path or not Path(mesh_path).is_file():
+            return
+        png = self._render_mesh_thumbnail(Path(mesh_path))
+        if not png:
+            return
+        import base64
+
+        b64 = base64.b64encode(png).decode("ascii")
+        image = tk.PhotoImage(data=b64)
+        self._thumbnail_image = image
+        if hasattr(self, "_thumbnail_label"):
+            self._thumbnail_label.configure(image=image)
+        if hasattr(self, "_pipeline_thumbnail_label"):
+            self._pipeline_thumbnail_label.configure(image=image)
+
+    def _build_pipeline_tab(self) -> None:
+        frame = ttk.Frame(self.notebook)
+        self.notebook.add(frame, text="Pipeline")
+
+        ttk.Label(frame, text="Kinect Forge — Quick Scan", font=("", 13, "bold")).grid(
+            row=0, column=0, columnspan=2, sticky=tk.W, padx=12, pady=(10, 4)
+        )
+        ttk.Separator(frame, orient=tk.HORIZONTAL).grid(
+            row=1, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=4
+        )
+
+        # Step 1: Capture
+        ttk.Label(frame, text="Step 1 — Capture", font=("", 11, "bold")).grid(
+            row=2, column=0, sticky=tk.W, padx=12, pady=(8, 2)
+        )
+        self._step1_label = ttk.Label(
+            frame, textvariable=self._pipeline_step1_status, foreground="gray"
+        )
+        self._step1_label.grid(row=2, column=1, sticky=tk.W, padx=4)
+
+        capture_inner = ttk.Frame(frame)
+        capture_inner.grid(row=3, column=0, columnspan=2, sticky=tk.W, padx=20, pady=4)
+        ttk.Label(capture_inner, text="Preset:").pack(side=tk.LEFT)
+        self._pipeline_capture_preset = tk.StringVar(value="small-object")
+        ttk.Entry(capture_inner, textvariable=self._pipeline_capture_preset, width=16).pack(
+            side=tk.LEFT, padx=4
+        )
+        ttk.Label(capture_inner, text="Output:").pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Entry(capture_inner, textvariable=self.capture_output, width=14).pack(
+            side=tk.LEFT, padx=4
+        )
+
+        def pipeline_capture() -> None:
+            try:
+                from kinect_forge.sensors.freenect_v1 import FreenectV1Sensor as _S
+
+                sensor = _S()
+            except Exception as exc:  # pragma: no cover
+                self._log(f"[pipeline/capture] {exc}")
+                return
+            preset_name = self._pipeline_capture_preset.get()
+            try:
+                profile = capture_preset(preset_name)
+                self.capture_fps.set(profile["fps"])
+                self.capture_frames.set(profile["frames"])
+                self.capture_depth_min.set(profile["depth_min"])
+                self.capture_depth_max.set(profile["depth_max"])
+                self.capture_mask.set(profile["mask_background"])
+                self.capture_auto_stop.set(profile["auto_stop"])
+            except Exception:
+                pass
+            config = CaptureConfig(
+                frames=self.capture_frames.get(),
+                fps=self.capture_fps.get(),
+                warmup=self.capture_warmup.get(),
+                mode=self.capture_mode.get().lower(),
+                depth_min=self.capture_depth_min.get(),
+                depth_max=self.capture_depth_max.get(),
+                mask_background=self.capture_mask.get(),
+                auto_stop=self.capture_auto_stop.get(),
+            )
+            capture_frames(sensor, Path(self.capture_output.get()), config)
+            self._pipeline_step1_status.set("done")
+            self._step1_label.configure(foreground="green")
+
+        ttk.Button(
+            frame,
+            text="Start Capture",
+            command=lambda: self._run_task("pipeline/capture", pipeline_capture),
+        ).grid(row=4, column=0, columnspan=2, sticky=tk.W, padx=20, pady=(0, 8))
+
+        ttk.Separator(frame, orient=tk.HORIZONTAL).grid(
+            row=5, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=4
+        )
+
+        # Step 2: Reconstruct
+        ttk.Label(frame, text="Step 2 — Build Model", font=("", 11, "bold")).grid(
+            row=6, column=0, sticky=tk.W, padx=12, pady=(8, 2)
+        )
+        self._step2_label = ttk.Label(
+            frame, textvariable=self._pipeline_step2_status, foreground="gray"
+        )
+        self._step2_label.grid(row=6, column=1, sticky=tk.W, padx=4)
+
+        recon_inner = ttk.Frame(frame)
+        recon_inner.grid(row=7, column=0, columnspan=2, sticky=tk.W, padx=20, pady=4)
+        ttk.Label(recon_inner, text="Preset:").pack(side=tk.LEFT)
+        self._pipeline_recon_preset = tk.StringVar(value="small-object")
+        ttk.Entry(recon_inner, textvariable=self._pipeline_recon_preset, width=16).pack(
+            side=tk.LEFT, padx=4
+        )
+
+        self._pipeline_progress_bar = ttk.Progressbar(
+            frame, mode="determinate", maximum=100, length=280
+        )
+        self._pipeline_progress_bar.grid(
+            row=8, column=0, columnspan=2, sticky=tk.W, padx=20, pady=2
+        )
+        self._pipeline_progress_text = tk.StringVar(value="")
+        ttk.Label(frame, textvariable=self._pipeline_progress_text).grid(
+            row=9, column=0, columnspan=2, sticky=tk.W, padx=20
+        )
+
+        def pipeline_reconstruct() -> None:
+            if not self._dataset_ready(self.capture_output.get()):
+                self._log("[pipeline/reconstruct] No dataset found. Run capture first.")
+                return
+            preset_name = self._pipeline_recon_preset.get()
+            try:
+                preset_cfg = reconstruction_preset(preset_name)
+            except Exception:
+                preset_cfg = reconstruction_preset("small-object")
+            output_path = Path(self.capture_output.get()) / "model.ply"
+            self.recon_output.set(str(output_path))
+            self._pipeline_progress_bar["value"] = 0
+            self._pipeline_progress_text.set("")
+
+            def on_progress(current: int, total: int) -> None:
+                pct = int(100 * current / total) if total else 0
+                self._pipeline_progress_bar["value"] = pct
+                self._pipeline_progress_text.set(f"Frame {current} / {total}")
+
+            reconstruct_mesh(
+                Path(self.capture_output.get()),
+                output_path,
+                preset_cfg,
+                progress_callback=on_progress,
+            )
+            self._pipeline_step2_status.set("done")
+            self._step2_label.configure(foreground="green")
+            self.root.after(0, self._update_thumbnail, str(output_path))
+
+        ttk.Button(
+            frame,
+            text="Build Model",
+            command=lambda: self._run_task("pipeline/reconstruct", pipeline_reconstruct),
+        ).grid(row=10, column=0, columnspan=2, sticky=tk.W, padx=20, pady=(0, 8))
+
+        ttk.Separator(frame, orient=tk.HORIZONTAL).grid(
+            row=11, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=4
+        )
+
+        # Step 3: View
+        ttk.Label(frame, text="Step 3 — View Model", font=("", 11, "bold")).grid(
+            row=12, column=0, sticky=tk.W, padx=12, pady=(8, 2)
+        )
+
+        self._pipeline_thumbnail_label = ttk.Label(frame)
+        self._pipeline_thumbnail_label.grid(
+            row=13, column=0, columnspan=2, sticky=tk.W, padx=20, pady=4
+        )
+
+        def pipeline_view() -> None:
+            mesh_path = Path(self.capture_output.get()) / "model.ply"
+            if mesh_path.is_file():
+                view_mesh(mesh_path)
+            else:
+                self._log("[pipeline/view] No model.ply found. Run reconstruct first.")
+
+        ttk.Button(
+            frame,
+            text="Open Viewer",
+            command=lambda: self._run_task("pipeline/view", pipeline_view),
+        ).grid(row=14, column=0, columnspan=2, sticky=tk.W, padx=20, pady=(0, 12))
 
     def _build_status_tab(self) -> None:
         frame = ttk.Frame(self.notebook)
@@ -436,6 +644,7 @@ class App:
         self.recon_icp_distance = tk.DoubleVar(value=0.015)
         self.recon_icp_voxel = tk.DoubleVar(value=0.008)
         self.recon_icp_iter = tk.IntVar(value=40)
+        self.recon_loop_closure = tk.BooleanVar(value=False)
         self.recon_smooth = tk.IntVar(value=5)
         self.recon_fill = tk.DoubleVar(value=0.008)
 
@@ -452,7 +661,12 @@ class App:
 
         icp_frame = ttk.Frame(frame)
         icp_frame.grid(row=8, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
-        ttk.Checkbutton(icp_frame, text="ICP Refine", variable=self.recon_icp).pack(anchor=tk.W)
+        ttk.Checkbutton(icp_frame, text="ICP Refine", variable=self.recon_icp).pack(
+            side=tk.LEFT, anchor=tk.W
+        )
+        ttk.Checkbutton(icp_frame, text="Loop Closure", variable=self.recon_loop_closure).pack(
+            side=tk.LEFT, anchor=tk.W, padx=(12, 0)
+        )
 
         self._entry_row(frame, "ICP Distance", self.recon_icp_distance, 9)
         self._entry_row(frame, "ICP Voxel", self.recon_icp_voxel, 10)
@@ -506,6 +720,7 @@ class App:
                 icp_distance=self.recon_icp_distance.get(),
                 icp_voxel=self.recon_icp_voxel.get(),
                 icp_iterations=self.recon_icp_iter.get(),
+                loop_closure=self.recon_loop_closure.get(),
                 smooth_iterations=self.recon_smooth.get(),
                 fill_hole_radius=self.recon_fill.get(),
                 preset=self.recon_preset.get(),
@@ -519,6 +734,7 @@ class App:
             reconstruct_mesh(
                 Path(self.recon_input.get()), output_path, config, progress_callback=on_progress
             )
+            self.root.after(0, self._update_thumbnail, str(output_path))
 
         self.recon_button = ttk.Button(
             frame,
@@ -587,6 +803,9 @@ class App:
         )
         self.view_button.grid(row=3, column=0, padx=8, pady=8, sticky=tk.W)
         self.view_button.state(["disabled"])
+
+        self._thumbnail_label = ttk.Label(frame)
+        self._thumbnail_label.grid(row=4, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
 
     def _build_calibrate_tab(self) -> None:
         frame = ttk.Frame(self.notebook)
