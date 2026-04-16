@@ -102,10 +102,14 @@ def capture_frames(
         intrinsics = _find_default_calibration() or KinectIntrinsics()
     sensor_depth_scale = getattr(sensor, "depth_scale", None)
     sensor_depth_format = getattr(getattr(sensor, "_config", None), "depth_format", "mm")
+    effective_depth_scale = (
+        float(sensor_depth_scale) if sensor_depth_scale is not None else config.depth_scale
+    )
     meta = DatasetMeta(
         intrinsics=intrinsics,
-        depth_scale=sensor_depth_scale if sensor_depth_scale is not None else config.depth_scale,
+        depth_scale=effective_depth_scale,
         depth_trunc=config.depth_trunc,
+        capture_mode=config.mode,
         depth_format=sensor_depth_format,
         turntable_model=config.turntable_model,
         turntable_diameter_mm=config.turntable_diameter_mm,
@@ -140,7 +144,7 @@ def capture_frames(
                 frame.depth,
                 config.depth_min,
                 config.depth_max,
-                config.depth_scale,
+                effective_depth_scale,
                 config.mask_background,
             )
             color, depth = _apply_roi(
@@ -150,8 +154,8 @@ def capture_frames(
                 color, depth = _apply_color_mask(color, depth, config.hsv_lower, config.hsv_upper)
             save_frame = True
             if config.mode == "turntable" and last_saved_depth is not None:
-                depth_m = depth.astype(np.float32) / config.depth_scale
-                last_m = last_saved_depth.astype(np.float32) / config.depth_scale
+                depth_m = depth.astype(np.float32) / effective_depth_scale
+                last_m = last_saved_depth.astype(np.float32) / effective_depth_scale
                 delta = np.mean(np.abs(depth_m - last_m))
                 save_frame = bool(delta >= config.change_threshold)
 
@@ -175,8 +179,8 @@ def capture_frames(
                     next_tilt_at = saved + max(1, config.tilt_hold_frames)
             elif config.auto_stop and config.mode == "turntable":
                 if last_saved_depth is not None:
-                    depth_m = depth.astype(np.float32) / config.depth_scale
-                    last_m = last_saved_depth.astype(np.float32) / config.depth_scale
+                    depth_m = depth.astype(np.float32) / effective_depth_scale
+                    last_m = last_saved_depth.astype(np.float32) / effective_depth_scale
                     delta = np.mean(np.abs(depth_m - last_m))
                     if delta < config.auto_stop_delta:
                         stagnant += 1

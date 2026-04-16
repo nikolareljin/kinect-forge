@@ -5,7 +5,7 @@ import sys
 import threading
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, TypeVar, cast
 
 import tkinter as tk
 from tkinter import filedialog, ttk
@@ -54,8 +54,34 @@ class App:
         self._refresh_calib_status()
 
     def _log(self, message: str) -> None:
+        if threading.current_thread() is not threading.main_thread():
+            self.root.after(0, self._log, message)
+            return
         self.log_text.insert(tk.END, message + "\n")
         self.log_text.see(tk.END)
+
+    _T = TypeVar("_T")
+
+    def _call_on_ui_thread(self, fn: Callable[[], _T]) -> _T:
+        if threading.current_thread() is threading.main_thread():
+            return fn()
+
+        event = threading.Event()
+        result: dict[str, object] = {}
+
+        def runner() -> None:
+            try:
+                result["value"] = fn()
+            except Exception as exc:  # pragma: no cover
+                result["error"] = exc
+            finally:
+                event.set()
+
+        self.root.after(0, runner)
+        event.wait()
+        if "error" in result:
+            raise result["error"]  # type: ignore[misc]
+        return result["value"]  # type: ignore[return-value]
 
     def _dataset_ready(self, root: str) -> bool:
         if not root:
@@ -81,6 +107,9 @@ class App:
             self._log(f"[{label}] error: mesh file is empty: {mesh_path}")
             return False
         return True
+
+    def _set_widget_state(self, widget: tk.Widget, states: list[str]) -> None:
+        widget.state(states)  # type: ignore[attr-defined]
 
     def _run_task(self, label: str, fn: Callable[[], None]) -> None:
         def runner() -> None:
@@ -124,7 +153,7 @@ class App:
             bounds = mesh.get_axis_aligned_bounding_box()
             renderer.setup_camera(60.0, bounds, bounds.get_center())
             img = renderer.render_to_image()
-            return o3d.io.write_image_to_memory(img, ".png")
+            return cast(Optional[bytes], o3d.io.write_image_to_memory(img, ".png"))
         except Exception:
             return None
 
@@ -184,30 +213,39 @@ class App:
             except Exception as exc:  # pragma: no cover
                 self._log(f"[pipeline/capture] {exc}")
                 return
-            preset_name = self._pipeline_capture_preset.get()
-            try:
-                profile = capture_preset(preset_name)
-                self.capture_fps.set(profile["fps"])
-                self.capture_frames.set(profile["frames"])
-                self.capture_depth_min.set(profile["depth_min"])
-                self.capture_depth_max.set(profile["depth_max"])
-                self.capture_mask.set(profile["mask_background"])
-                self.capture_auto_stop.set(profile["auto_stop"])
-            except Exception:
-                pass
-            config = CaptureConfig(
-                frames=self.capture_frames.get(),
-                fps=self.capture_fps.get(),
-                warmup=self.capture_warmup.get(),
-                mode=self.capture_mode.get().lower(),
-                depth_min=self.capture_depth_min.get(),
-                depth_max=self.capture_depth_max.get(),
-                mask_background=self.capture_mask.get(),
-                auto_stop=self.capture_auto_stop.get(),
-            )
-            capture_frames(sensor, Path(self.capture_output.get()), config)
-            self._pipeline_step1_status.set("done")
-            self._step1_label.configure(foreground="green")
+
+            def prepare_capture_state() -> tuple[Path, CaptureConfig]:
+                preset_name = self._pipeline_capture_preset.get()
+                try:
+                    profile = capture_preset(preset_name)
+                    self.capture_fps.set(profile["fps"])
+                    self.capture_frames.set(profile["frames"])
+                    self.capture_depth_min.set(profile["depth_min"])
+                    self.capture_depth_max.set(profile["depth_max"])
+                    self.capture_mask.set(profile["mask_background"])
+                    self.capture_auto_stop.set(profile["auto_stop"])
+                except Exception:
+                    pass
+                config = CaptureConfig(
+                    frames=self.capture_frames.get(),
+                    fps=self.capture_fps.get(),
+                    warmup=self.capture_warmup.get(),
+                    mode=self.capture_mode.get().lower(),
+                    depth_min=self.capture_depth_min.get(),
+                    depth_max=self.capture_depth_max.get(),
+                    mask_background=self.capture_mask.get(),
+                    auto_stop=self.capture_auto_stop.get(),
+                )
+                return Path(self.capture_output.get()), config
+
+            output_path, config = self._call_on_ui_thread(prepare_capture_state)
+            capture_frames(sensor, output_path, config)
+
+            def mark_capture_done() -> None:
+                self._pipeline_step1_status.set("done")
+                self._step1_label.configure(foreground="green")
+
+            self.root.after(0, mark_capture_done)
 
         ttk.Button(
             frame,
@@ -248,33 +286,47 @@ class App:
         )
 
         def pipeline_reconstruct() -> None:
-            if not self._dataset_ready(self.capture_output.get()):
+            capture_root = self._call_on_ui_thread(self.capture_output.get)
+            if not self._dataset_ready(capture_root):
                 self._log("[pipeline/reconstruct] No dataset found. Run capture first.")
                 return
-            preset_name = self._pipeline_recon_preset.get()
+
+            preset_name = self._call_on_ui_thread(self._pipeline_recon_preset.get)
             try:
                 preset_cfg = reconstruction_preset(preset_name)
             except Exception:
                 preset_cfg = reconstruction_preset("small-object")
-            output_path = Path(self.capture_output.get()) / "model.ply"
-            self.recon_output.set(str(output_path))
-            self._pipeline_progress_bar["value"] = 0
-            self._pipeline_progress_text.set("")
+            output_path = Path(capture_root) / "model.ply"
+
+            def reset_progress_ui() -> None:
+                self.recon_output.set(str(output_path))
+                self._pipeline_progress_bar["value"] = 0
+                self._pipeline_progress_text.set("")
+
+            self._call_on_ui_thread(reset_progress_ui)
 
             def on_progress(current: int, total: int) -> None:
                 pct = int(100 * current / total) if total else 0
-                self._pipeline_progress_bar["value"] = pct
-                self._pipeline_progress_text.set(f"Frame {current} / {total}")
+
+                def update_progress_ui() -> None:
+                    self._pipeline_progress_bar.configure(value=pct)
+                    self._pipeline_progress_text.set(f"Frame {current} / {total}")
+
+                self.root.after(0, update_progress_ui)
 
             reconstruct_mesh(
-                Path(self.capture_output.get()),
+                Path(capture_root),
                 output_path,
                 preset_cfg,
                 progress_callback=on_progress,
             )
-            self._pipeline_step2_status.set("done")
-            self._step2_label.configure(foreground="green")
-            self.root.after(0, self._update_thumbnail, str(output_path))
+
+            def mark_reconstruct_done() -> None:
+                self._pipeline_step2_status.set("done")
+                self._step2_label.configure(foreground="green")
+                self._update_thumbnail(str(output_path))
+
+            self.root.after(0, mark_reconstruct_done)
 
         ttk.Button(
             frame,
@@ -621,11 +673,11 @@ class App:
                 self.recon_input.set(capture_root)
             if self.recon_output.get() in {"", "model.ply"}:
                 self.recon_output.set(str(Path(capture_root) / "model.ply"))
-            self.view_button.state(["!disabled"])
-            self.recon_button.state(["!disabled"])
+            self._set_widget_state(self.view_button, ["!disabled"])
+            self._set_widget_state(self.recon_button, ["!disabled"])
         else:
-            self.view_button.state(["disabled"])
-            self.recon_button.state(["disabled"])
+            self._set_widget_state(self.view_button, ["disabled"])
+            self._set_widget_state(self.recon_button, ["disabled"])
         self.root.after(1000, self._refresh_dataset_state)
 
     def _build_reconstruct_tab(self) -> None:
@@ -742,7 +794,7 @@ class App:
             command=lambda: self._run_task("reconstruct", run_reconstruct),
         )
         self.recon_button.grid(row=16, column=0, padx=8, pady=8, sticky=tk.W)
-        self.recon_button.state(["disabled"])
+        self._set_widget_state(self.recon_button, ["disabled"])
 
         ttk.Button(frame, text="Apply Preset", command=apply_preset).grid(
             row=16, column=1, padx=8, pady=8, sticky=tk.W
@@ -802,7 +854,7 @@ class App:
             frame, text="Open Viewer", command=lambda: self._run_task("view", run_view)
         )
         self.view_button.grid(row=3, column=0, padx=8, pady=8, sticky=tk.W)
-        self.view_button.state(["disabled"])
+        self._set_widget_state(self.view_button, ["disabled"])
 
         self._thumbnail_label = ttk.Label(frame)
         self._thumbnail_label.grid(row=4, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)

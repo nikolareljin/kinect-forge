@@ -17,7 +17,7 @@ class FreenectV1Sensor:
     def __init__(self, config: Optional[FreenectV1Config] = None) -> None:
         self._config = config or FreenectV1Config()
         try:
-            import freenect  # type: ignore
+            import freenect  # type: ignore[import-not-found]
         except ImportError as exc:
             raise RuntimeError(
                 "freenect not available. Install libfreenect and python3-freenect "
@@ -72,7 +72,7 @@ def probe_device() -> bool:
 
 def set_tilt_degs(angle: float, index: int = 0) -> None:
     try:
-        import freenect  # type: ignore
+        import freenect
     except ImportError as exc:
         raise RuntimeError("freenect not available for tilt control.") from exc
 

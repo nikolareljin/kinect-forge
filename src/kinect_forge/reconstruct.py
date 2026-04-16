@@ -131,6 +131,88 @@ def _refine_poses_icp(
     return refined
 
 
+def _rotation_to_quaternion(rotation: np.ndarray) -> np.ndarray:
+    trace = float(np.trace(rotation))
+    if trace > 0.0:
+        s = np.sqrt(trace + 1.0) * 2.0
+        quat = np.array(
+            [
+                0.25 * s,
+                (rotation[2, 1] - rotation[1, 2]) / s,
+                (rotation[0, 2] - rotation[2, 0]) / s,
+                (rotation[1, 0] - rotation[0, 1]) / s,
+            ]
+        )
+    else:
+        diag = np.diag(rotation)
+        idx = int(np.argmax(diag))
+        if idx == 0:
+            s = np.sqrt(1.0 + rotation[0, 0] - rotation[1, 1] - rotation[2, 2]) * 2.0
+            quat = np.array(
+                [
+                    (rotation[2, 1] - rotation[1, 2]) / s,
+                    0.25 * s,
+                    (rotation[0, 1] + rotation[1, 0]) / s,
+                    (rotation[0, 2] + rotation[2, 0]) / s,
+                ]
+            )
+        elif idx == 1:
+            s = np.sqrt(1.0 + rotation[1, 1] - rotation[0, 0] - rotation[2, 2]) * 2.0
+            quat = np.array(
+                [
+                    (rotation[0, 2] - rotation[2, 0]) / s,
+                    (rotation[0, 1] + rotation[1, 0]) / s,
+                    0.25 * s,
+                    (rotation[1, 2] + rotation[2, 1]) / s,
+                ]
+            )
+        else:
+            s = np.sqrt(1.0 + rotation[2, 2] - rotation[0, 0] - rotation[1, 1]) * 2.0
+            quat = np.array(
+                [
+                    (rotation[1, 0] - rotation[0, 1]) / s,
+                    (rotation[0, 2] + rotation[2, 0]) / s,
+                    (rotation[1, 2] + rotation[2, 1]) / s,
+                    0.25 * s,
+                ]
+            )
+    quat /= np.linalg.norm(quat)
+    if quat[0] < 0.0:
+        quat *= -1.0
+    return quat
+
+
+def _quaternion_to_rotation(quat: np.ndarray) -> np.ndarray:
+    w, x, y, z = quat / np.linalg.norm(quat)
+    return np.array(
+        [
+            [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w), 2.0 * (x * z + y * w)],
+            [2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - x * w)],
+            [2.0 * (x * z - y * w), 2.0 * (y * z + x * w), 1.0 - 2.0 * (x * x + y * y)],
+        ]
+    )
+
+
+def _rotation_power(rotation: np.ndarray, alpha: float) -> np.ndarray:
+    quat = _rotation_to_quaternion(rotation)
+    angle = 2.0 * np.arccos(np.clip(quat[0], -1.0, 1.0))
+    sin_half = np.linalg.norm(quat[1:])
+    if np.isclose(sin_half, 0.0) or np.isclose(angle, 0.0):
+        return np.eye(3)
+
+    axis = quat[1:] / sin_half
+    scaled_half = alpha * angle * 0.5
+    scaled_quat = np.concatenate(([np.cos(scaled_half)], axis * np.sin(scaled_half)))
+    return _quaternion_to_rotation(scaled_quat)
+
+
+def _interpolate_rigid_transform(transform: np.ndarray, alpha: float) -> np.ndarray:
+    correction = np.eye(4)
+    correction[:3, :3] = _rotation_power(transform[:3, :3], alpha)
+    correction[:3, 3] = transform[:3, 3] * alpha
+    return correction
+
+
 def _apply_loop_closure(
     poses: List[np.ndarray],
     rgbd_images: List[o3d.geometry.RGBDImage],
@@ -167,10 +249,7 @@ def _apply_loop_closure(
     corrected: List[np.ndarray] = []
     for i, pose in enumerate(poses):
         alpha = i / (n - 1)
-        # Linearly blend from identity (no correction at frame 0) to inv_error
-        # (full correction at last frame). Valid for small residuals.
-        blend = (1.0 - alpha) * np.eye(4) + alpha * inv_error
-        corrected.append(blend @ pose)
+        corrected.append(_interpolate_rigid_transform(inv_error, alpha) @ pose)
     return corrected
 
 
@@ -270,7 +349,7 @@ def reconstruct_mesh(
         _rgbd_from_paths(color, depth, depth_scale, depth_trunc) for color, depth in pairs
     ]
 
-    if meta.turntable_rotation_seconds is not None:
+    if meta.capture_mode == "turntable":
         poses = _estimate_turntable_poses(
             rgbd_images,
             intrinsic,

@@ -13,6 +13,7 @@ class DatasetMeta:
     intrinsics: KinectIntrinsics
     depth_scale: float
     depth_trunc: float
+    capture_mode: str = "standard"
     color_format: str = "rgb"
     depth_unit: str = "mm"
     depth_format: str = "mm"
@@ -25,6 +26,7 @@ class DatasetMeta:
             "intrinsics": self.intrinsics.to_dict(),
             "depth_scale": self.depth_scale,
             "depth_trunc": self.depth_trunc,
+            "capture_mode": self.capture_mode,
             "color_format": self.color_format,
             "depth_unit": self.depth_unit,
             "depth_format": self.depth_format,
@@ -54,6 +56,7 @@ def load_metadata(root: Path) -> DatasetMeta:
         intrinsics=intrinsics,
         depth_scale=float(payload["depth_scale"]),
         depth_trunc=float(payload["depth_trunc"]),
+        capture_mode=payload.get("capture_mode", "standard"),
         color_format=payload.get("color_format", "rgb"),
         depth_unit=payload.get("depth_unit", "mm"),
         depth_format=payload.get("depth_format", "mm"),
