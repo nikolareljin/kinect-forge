@@ -17,7 +17,7 @@ class FreenectV1Sensor:
     def __init__(self, config: Optional[FreenectV1Config] = None) -> None:
         self._config = config or FreenectV1Config()
         try:
-            import freenect  # type: ignore[import-not-found]
+            import freenect
         except ImportError as exc:
             raise RuntimeError(
                 "freenect not available. Install libfreenect and python3-freenect "

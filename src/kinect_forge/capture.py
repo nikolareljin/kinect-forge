@@ -102,8 +102,13 @@ def capture_frames(
         intrinsics = _find_default_calibration() or KinectIntrinsics()
     sensor_depth_scale = getattr(sensor, "depth_scale", None)
     sensor_depth_format = getattr(getattr(sensor, "_config", None), "depth_format", "mm")
+    # For 11bit depth, sensor.depth_scale is 1.0 (raw units), which is not meaningful as
+    # a mm-conversion factor for downstream consumers. Fall back to config.depth_scale so
+    # masking thresholds and metadata stay consistent with what reconstruct_mesh expects.
     effective_depth_scale = (
-        float(sensor_depth_scale) if sensor_depth_scale is not None else config.depth_scale
+        float(sensor_depth_scale)
+        if sensor_depth_scale is not None and sensor_depth_format != "11bit"
+        else config.depth_scale
     )
     meta = DatasetMeta(
         intrinsics=intrinsics,

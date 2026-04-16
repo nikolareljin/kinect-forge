@@ -9,6 +9,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Bootstrap submodules when running in CI before the update step
+SCRIPT_HELPERS_DIR="${SCRIPT_HELPERS_DIR:-$ROOT_DIR/scripts/script-helpers}"
+if [ ! -f "$SCRIPT_HELPERS_DIR/helpers.sh" ]; then
+  git -C "$ROOT_DIR" submodule update --init --recursive
+fi
+
 source "$ROOT_DIR/scripts/include.sh" "$@"
 cd "$ROOT_DIR"
 
