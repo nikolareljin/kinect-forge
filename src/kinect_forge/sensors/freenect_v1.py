@@ -20,8 +20,9 @@ class FreenectV1Sensor:
             import freenect
         except ImportError as exc:
             raise RuntimeError(
-                "freenect not available. Install libfreenect and python3-freenect "
-                "(Ubuntu: sudo apt install libfreenect-dev python3-freenect)."
+                "freenect not available. Install libfreenect-dev and freenect Python bindings. "
+                "Ubuntu 20.04 to 22.04 usually support python3-freenect via apt. "
+                "Ubuntu 24.04+ should rerun ./setup to install freenect==0.1.0."
             ) from exc
         self._freenect = freenect
 

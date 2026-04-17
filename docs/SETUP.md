@@ -16,12 +16,16 @@ See `docs/PACKAGING.md` for creating desktop bundles on Linux/Windows/macOS.
 - VXB 8-inch motorized display stand (USB or battery powered, ~16s per rotation, 7 lb capacity).
 
 ## System packages
-Install libfreenect and the Python bindings:
+Install libfreenect and Python bindings:
 ```bash
 sudo apt install libfreenect-dev
-# Optional (bindings may be unavailable on some Ubuntu versions):
+# Ubuntu 20.04 to 22.04:
 sudo apt install python3-freenect || true
 ```
+
+Ubuntu 24.04+ removed `python3-freenect` from apt. `./setup` and `./install`
+now fall back to `pip install freenect==0.1.0`, which provides a Linux wheel
+for Python 3.12 and links against system `libfreenect`.
 
 GUI package (optional):
 ```bash
@@ -33,14 +37,19 @@ Recommended full install (Ubuntu):
 sudo apt update
 sudo apt install -y libfreenect-dev python3-tk \
   build-essential pkg-config cmake
-# Optional (bindings may be unavailable on some Ubuntu versions):
+# Ubuntu 20.04 to 22.04:
 sudo apt install -y python3-freenect || true
 ```
 
 `./install` on Ubuntu performs the same dependency install by default. If
-`python3-freenect` is unavailable (Ubuntu 24.04+), it will attempt
-`pip install freenect` into the system venv. Use `./install --no-system-deps`
-if you want to skip apt installs.
+`python3-freenect` is unavailable, `./setup` and `./install` install
+`freenect==0.1.0` from PyPI into target venv instead. Use
+`./install --no-system-deps` if you want to skip apt installs.
+
+Ubuntu 24.04+ Kinect v1 path:
+```bash
+./setup
+```
 
 ## USB permissions (udev)
 If the Kinect opens only with `sudo`, install udev rules:

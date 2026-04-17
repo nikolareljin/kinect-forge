@@ -3,7 +3,8 @@
 ## Kinect not detected
 - Confirm USB power + data cable are connected.
 - Run `python -m kinect_forge status`.
-- Ensure `libfreenect-dev` and `python3-freenect` are installed.
+- Ensure `libfreenect-dev` and freenect Python bindings are installed.
+- On Ubuntu 24.04+, rerun `./setup` to install `freenect==0.1.0` into `.venv`.
 - Check udev rules if access requires sudo.
 
 ## Reconstruction looks noisy

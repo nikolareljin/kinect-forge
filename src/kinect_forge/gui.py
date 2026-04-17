@@ -28,6 +28,10 @@ class App:
         self.root = root
         self.root.title("Kinect Forge")
         self._preview_image: Optional[tk.PhotoImage] = None
+        self._live_preview_image: Optional[tk.PhotoImage] = None
+        self._live_preview_window: Optional[tk.Toplevel] = None
+        self._live_preview_label: Optional[ttk.Label] = None
+        self._live_preview_running = False
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -420,10 +424,17 @@ class App:
             if ok:
                 self._log("Kinect v1 backend detected and streaming.")
             else:
-                self._log("Kinect v1 backend not detected. Install libfreenect + python3-freenect.")
+                self._log(
+                    "Kinect v1 backend not detected. Install libfreenect-dev and freenect bindings. "
+                    "Ubuntu 24.04+ should use ./setup to install freenect==0.1.0."
+                )
 
         ttk.Button(
             frame, text="Check Status", command=lambda: self._run_task("status", check)
+        ).pack(anchor=tk.W, padx=8, pady=4)
+
+        ttk.Button(
+            frame, text="Open Live Preview", command=self._start_live_preview
         ).pack(anchor=tk.W, padx=8, pady=4)
 
     def _build_capture_tab(self) -> None:
@@ -666,6 +677,79 @@ class App:
         image = tk.PhotoImage(data=ppm)
         self._preview_image = image
         self.capture_preview_label.configure(image=image)
+
+    @staticmethod
+    def _depth_to_preview_rgb(depth: np.ndarray) -> np.ndarray:
+        if depth.ndim != 2:
+            raise ValueError("depth preview expects 2D depth array")
+        depth_f = depth.astype(np.float32)
+        valid = depth_f > 0
+        if not np.any(valid):
+            return np.zeros((depth.shape[0], depth.shape[1], 3), dtype=np.uint8)
+        low = float(np.percentile(depth_f[valid], 5))
+        high = float(np.percentile(depth_f[valid], 95))
+        if high <= low:
+            high = low + 1.0
+        scaled = np.clip((depth_f - low) / (high - low), 0.0, 1.0)
+        depth_u8 = (scaled * 255.0).astype(np.uint8)
+        return np.stack([depth_u8, depth_u8, depth_u8], axis=2)
+
+    def _compose_live_preview(self, color: np.ndarray, depth: np.ndarray) -> bytes:
+        depth_rgb = self._depth_to_preview_rgb(depth)
+        combined = np.concatenate([color, depth_rgb], axis=1)
+        return self._to_ppm_bytes(combined, max_width=960)
+
+    def _close_live_preview(self) -> None:
+        self._live_preview_running = False
+        window = self._live_preview_window
+        self._live_preview_window = None
+        self._live_preview_label = None
+        self._live_preview_image = None
+        if window is not None and window.winfo_exists():
+            window.destroy()
+
+    def _update_live_preview(self, ppm: bytes) -> None:
+        if not self._live_preview_running or self._live_preview_label is None:
+            return
+        image = tk.PhotoImage(data=ppm)
+        self._live_preview_image = image
+        self._live_preview_label.configure(image=image)
+
+    def _start_live_preview(self) -> None:
+        if self._live_preview_running:
+            self._log("Live preview already open.")
+            return
+        try:
+            sensor = FreenectV1Sensor()
+        except Exception as exc:  # pragma: no cover
+            self._log(f"Live preview failed: {exc}")
+            return
+
+        window = tk.Toplevel(self.root)
+        window.title("Kinect Live Preview")
+        ttk.Label(window, text="Color | Depth").pack(anchor=tk.W, padx=8, pady=(8, 2))
+        label = ttk.Label(window)
+        label.pack(anchor=tk.W, padx=8, pady=8)
+        window.protocol("WM_DELETE_WINDOW", self._close_live_preview)
+
+        self._live_preview_window = window
+        self._live_preview_label = label
+        self._live_preview_running = True
+
+        def runner() -> None:
+            try:
+                sensor.start()
+                while self._live_preview_running:
+                    frame = sensor.get_frame()
+                    ppm = self._compose_live_preview(frame.color, frame.depth)
+                    self.root.after(0, self._update_live_preview, ppm)
+            except Exception as exc:  # pragma: no cover
+                self._log(f"Live preview error: {exc}")
+            finally:
+                sensor.stop()
+                self.root.after(0, self._close_live_preview)
+
+        threading.Thread(target=runner, daemon=True).start()
 
     def _refresh_dataset_state(self) -> None:
         capture_root = self.capture_output.get()

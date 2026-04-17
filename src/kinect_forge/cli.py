@@ -42,8 +42,9 @@ def status() -> None:
         console.print("Kinect v1 backend detected and streaming.")
     else:
         console.print(
-            "Kinect v1 backend not detected. Ensure libfreenect and python3-freenect "
-            "are installed and the device is connected."
+            "Kinect v1 backend not detected. Ensure libfreenect-dev and freenect bindings "
+            "are installed and device is connected. Ubuntu 24.04+ should use ./setup "
+            "to install freenect==0.1.0."
         )
 
 

@@ -15,7 +15,8 @@ def _require_freenect() -> object:
     except ImportError as exc:
         print("freenect bindings not available.", file=sys.stderr)
         print(
-            "Install: libfreenect-dev + python3-freenect (if available) or pip install freenect.",
+            "Install: libfreenect-dev plus freenect bindings. Ubuntu 20.04 to 22.04 can use "
+            "python3-freenect. Ubuntu 24.04+ should rerun ./setup to install freenect==0.1.0.",
             file=sys.stderr,
         )
         raise SystemExit(1) from exc

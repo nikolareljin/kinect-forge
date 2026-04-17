@@ -35,9 +35,12 @@ python -m kinect_forge --help
 ## Kinect v1 setup (Ubuntu)
 ```bash
 sudo apt install libfreenect-dev
-# Optional (bindings may be unavailable on some Ubuntu versions):
+# Ubuntu 20.04 to 22.04:
 sudo apt install python3-freenect || true
 ```
+
+Ubuntu 24.04+ removed `python3-freenect` from apt. Run `./setup`, which now
+installs `freenect==0.1.0` into `.venv` for Kinect v1 capture support.
 
 GUI dependencies:
 ```bash
