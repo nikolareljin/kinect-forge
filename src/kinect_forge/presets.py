@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 from kinect_forge.config import ReconstructionConfig
 
@@ -14,11 +14,14 @@ def _load_presets() -> Dict[str, Any]:
     override = os.environ.get("KINECT_FORGE_PRESETS", "").strip()
     path = Path(override) if override else _DEFAULT_PRESETS_PATH
     try:
-        return json.loads(path.read_text())
+        payload = json.loads(path.read_text())
     except FileNotFoundError:
         raise ValueError(f"Preset config not found: {path}")
     except json.JSONDecodeError as exc:
         raise ValueError(f"Preset config invalid JSON: {path}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"Preset config must be a JSON object: {path}")
+    return cast(Dict[str, Any], payload)
 
 
 def _get_preset(group: str, name: str) -> Dict[str, Any]:
@@ -50,6 +53,6 @@ def reconstruction_preset(name: str) -> ReconstructionConfig:
     )
 
 
-def capture_preset(name: str):
+def capture_preset(name: str) -> Dict[str, Any]:
     preset = name.lower()
     return _get_preset("capture", preset)

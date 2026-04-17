@@ -17,13 +17,23 @@ class FreenectV1Sensor:
     def __init__(self, config: Optional[FreenectV1Config] = None) -> None:
         self._config = config or FreenectV1Config()
         try:
-            import freenect  # type: ignore
+            import freenect
         except ImportError as exc:
             raise RuntimeError(
-                "freenect not available. Install libfreenect and python3-freenect "
-                "(Ubuntu: sudo apt install libfreenect-dev python3-freenect)."
+                "freenect not available. Install libfreenect-dev and freenect Python bindings. "
+                "Ubuntu 20.04 to 22.04 usually support python3-freenect via apt. "
+                "Ubuntu 24.04+ should rerun ./setup to install freenect==0.1.0."
             ) from exc
         self._freenect = freenect
+
+    @property
+    def depth_scale(self) -> float:
+        """Scale factor converting raw depth values to metres.
+
+        DEPTH_MM values are in millimetres (scale = 1000.0).
+        DEPTH_11BIT values are raw sensor units and require separate calibration.
+        """
+        return 1000.0 if self._config.depth_format != "11bit" else 1.0
 
     def start(self) -> None:
         return None
@@ -54,11 +64,16 @@ def probe_device() -> bool:
         sensor = FreenectV1Sensor()
     except RuntimeError:
         return False
+    try:
+        _ = sensor.get_frame()
+        return True
+    except RuntimeError:
+        return False
 
 
 def set_tilt_degs(angle: float, index: int = 0) -> None:
     try:
-        import freenect  # type: ignore
+        import freenect
     except ImportError as exc:
         raise RuntimeError("freenect not available for tilt control.") from exc
 
@@ -77,8 +92,3 @@ def set_tilt_degs(angle: float, index: int = 0) -> None:
         freenect.close_device(dev)
     finally:
         freenect.shutdown(ctx)
-    try:
-        _ = sensor.get_frame()
-        return True
-    except RuntimeError:
-        return False

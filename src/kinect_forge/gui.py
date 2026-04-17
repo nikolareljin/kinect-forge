@@ -5,7 +5,7 @@ import sys
 import threading
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, TypeVar, cast
 
 import tkinter as tk
 from tkinter import filedialog, ttk
@@ -28,6 +28,10 @@ class App:
         self.root = root
         self.root.title("Kinect Forge")
         self._preview_image: Optional[tk.PhotoImage] = None
+        self._live_preview_image: Optional[tk.PhotoImage] = None
+        self._live_preview_window: Optional[tk.Toplevel] = None
+        self._live_preview_label: Optional[ttk.Label] = None
+        self._live_preview_running = False
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -37,90 +41,14 @@ class App:
         self.log_text = tk.Text(self.root, height=8, wrap=tk.WORD)
         self.log_text.pack(fill=tk.BOTH, expand=False)
 
-        self._build_status_tab()
-        self._build_capture_tab()
-        self._build_reconstruct_tab()
-        self._build_measure_tab()
-        self._build_view_tab()
-        self._build_calibrate_tab()
-        self.root.after(500, self._refresh_dataset_state)
+        self._calib_status = tk.StringVar(value="")
+        self._recon_progress_text = tk.StringVar(value="")
+        self._pipeline_step1_status = tk.StringVar(value="pending")
+        self._pipeline_step2_status = tk.StringVar(value="pending")
+        self._thumbnail_image: Optional[tk.PhotoImage] = None
 
-    def _log(self, message: str) -> None:
-        self.log_text.insert(tk.END, message + "\n")
-        self.log_text.see(tk.END)
-
-    def _dataset_ready(self, root: str) -> bool:
-        if not root:
-            return False
-        return (Path(root) / "metadata.json").is_file()
-
-    def _require_dataset(self, root: str, label: str) -> bool:
-        if self._dataset_ready(root):
-            return True
-        self._log(f"[{label}] error: metadata.json not found in {root}")
-        self._log("Run Capture first to create a dataset.")
-        return False
-
-    def _require_mesh(self, path: str, label: str) -> bool:
-        if not path:
-            self._log(f"[{label}] error: mesh path is empty")
-            return False
-        mesh_path = Path(path)
-        if not mesh_path.is_file():
-            self._log(f"[{label}] error: mesh file not found: {mesh_path}")
-            return False
-        if mesh_path.stat().st_size == 0:
-            self._log(f"[{label}] error: mesh file is empty: {mesh_path}")
-            return False
-        return True
-
-    def _run_task(self, label: str, fn: Callable[[], None]) -> None:
-        def runner() -> None:
-            self._log(f"[{label}] started")
-            try:
-                fn()
-                self._log(f"[{label}] completed")
-            except Exception as exc:  # pragma: no cover
-                self._log(f"[{label}] error: {exc}")
-
-        threading.Thread(target=runner, daemon=True).start()
-
-    def _build_status_tab(self) -> None:
-        frame = ttk.Frame(self.notebook)
-        self.notebook.add(frame, text="Status")
-
-        label = ttk.Label(frame, text="Check Kinect v1 backend status")
-        label.pack(anchor=tk.W, padx=8, pady=8)
-        env_label = ttk.Label(frame, text=f"Python: {sys.executable}")
-        env_label.pack(anchor=tk.W, padx=8, pady=2)
-        freenect_label = ttk.Label(frame, text="Freenect: checking...")
-        freenect_label.pack(anchor=tk.W, padx=8, pady=2)
-
-        try:
-            import freenect  # type: ignore
-
-            _ = freenect  # silence unused
-            freenect_label.config(text="Freenect: import OK")
-        except Exception as exc:  # pragma: no cover
-            freenect_label.config(text=f"Freenect: not available ({exc})")
-
-        def check() -> None:
-            ok = probe_device()
-            if ok:
-                self._log("Kinect v1 backend detected and streaming.")
-            else:
-                self._log(
-                    "Kinect v1 backend not detected. Install libfreenect + python3-freenect."
-                )
-
-        ttk.Button(frame, text="Check Status", command=lambda: self._run_task("status", check)).pack(
-            anchor=tk.W, padx=8, pady=4
-        )
-
-    def _build_capture_tab(self) -> None:
-        frame = ttk.Frame(self.notebook)
-        self.notebook.add(frame, text="Capture")
-
+        # Shared vars initialized here so both Pipeline and Capture/Reconstruct tabs
+        # can reference them regardless of tab build order.
         self.capture_output = tk.StringVar(value="captures")
         self.capture_frames = tk.IntVar(value=300)
         self.capture_fps = tk.DoubleVar(value=30.0)
@@ -151,6 +79,367 @@ class App:
         self.capture_tilt_max = tk.DoubleVar(value=10.0)
         self.capture_tilt_step = tk.DoubleVar(value=5.0)
         self.capture_tilt_hold = tk.IntVar(value=30)
+        self.recon_output = tk.StringVar(value="model.ply")
+
+        self._build_pipeline_tab()
+        self._build_status_tab()
+        self._build_capture_tab()
+        self._build_reconstruct_tab()
+        self._build_measure_tab()
+        self._build_view_tab()
+        self._build_calibrate_tab()
+        self.root.after(500, self._refresh_dataset_state)
+        self._refresh_calib_status()
+
+    def _log(self, message: str) -> None:
+        if threading.current_thread() is not threading.main_thread():
+            self.root.after(0, self._log, message)
+            return
+        self.log_text.insert(tk.END, message + "\n")
+        self.log_text.see(tk.END)
+
+    _T = TypeVar("_T")
+
+    def _call_on_ui_thread(self, fn: Callable[[], _T]) -> _T:
+        if threading.current_thread() is threading.main_thread():
+            return fn()
+
+        event = threading.Event()
+        result: dict[str, object] = {}
+
+        def runner() -> None:
+            try:
+                result["value"] = fn()
+            except Exception as exc:  # pragma: no cover
+                result["error"] = exc
+            finally:
+                event.set()
+
+        self.root.after(0, runner)
+        if not event.wait(timeout=10.0):
+            raise RuntimeError("UI thread did not respond within 10 seconds.")
+        if "error" in result:
+            raise result["error"]  # type: ignore[misc]
+        return result["value"]  # type: ignore[return-value]
+
+    def _dataset_ready(self, root: str) -> bool:
+        if not root:
+            return False
+        return (Path(root) / "metadata.json").is_file()
+
+    def _require_dataset(self, root: str, label: str) -> bool:
+        if self._dataset_ready(root):
+            return True
+        self._log(f"[{label}] error: metadata.json not found in {root}")
+        self._log("Run Capture first to create a dataset.")
+        return False
+
+    def _require_mesh(self, path: str, label: str) -> bool:
+        if not path:
+            self._log(f"[{label}] error: mesh path is empty")
+            return False
+        mesh_path = Path(path)
+        if not mesh_path.is_file():
+            self._log(f"[{label}] error: mesh file not found: {mesh_path}")
+            return False
+        if mesh_path.stat().st_size == 0:
+            self._log(f"[{label}] error: mesh file is empty: {mesh_path}")
+            return False
+        return True
+
+    def _set_widget_state(self, widget: tk.Widget, states: list[str]) -> None:
+        widget.state(states)  # type: ignore[attr-defined]
+
+    def _run_task(self, label: str, fn: Callable[[], None]) -> None:
+        def runner() -> None:
+            self._log(f"[{label}] started")
+            try:
+                fn()
+                self._log(f"[{label}] completed")
+            except Exception as exc:  # pragma: no cover
+                self._log(f"[{label}] error: {exc}")
+
+        threading.Thread(target=runner, daemon=True).start()
+
+    def _refresh_calib_status(self) -> None:
+        from pathlib import Path as _Path
+
+        if (_Path.cwd() / "calibration.json").is_file():
+            self._calib_status.set("Calibration: loaded from calibration.json")
+        else:
+            self._calib_status.set("Calibration: using Kinect v1 defaults")
+
+    def _update_recon_progress(self, current: int, total: int, pct: int) -> None:
+        self._recon_progress_bar["value"] = pct
+        self._recon_progress_text.set(f"Frame {current} / {total}")
+
+    def _render_mesh_thumbnail(self, mesh_path: Path) -> Optional[bytes]:
+        """Render a 400x300 PNG thumbnail of the mesh using Open3D offscreen rendering.
+
+        Returns raw PNG bytes, or None if rendering is unavailable.
+        """
+        try:
+            import open3d as o3d
+
+            renderer = o3d.visualization.rendering.OffscreenRenderer(400, 300)
+            mesh = o3d.io.read_triangle_mesh(str(mesh_path))
+            if mesh.is_empty():
+                return None
+            mesh.compute_vertex_normals()
+            mat = o3d.visualization.rendering.MaterialRecord()
+            mat.shader = "defaultLit"
+            renderer.scene.add_geometry("mesh", mesh, mat)
+            bounds = mesh.get_axis_aligned_bounding_box()
+            renderer.setup_camera(60.0, bounds, bounds.get_center())
+            img = renderer.render_to_image()
+            return cast(Optional[bytes], o3d.io.write_image_to_memory(img, ".png"))
+        except Exception:
+            return None
+
+    def _update_thumbnail(self, mesh_path: str) -> None:
+        if not mesh_path or not Path(mesh_path).is_file():
+            return
+        png = self._render_mesh_thumbnail(Path(mesh_path))
+        if not png:
+            return
+        import base64
+
+        b64 = base64.b64encode(png).decode("ascii")
+        image = tk.PhotoImage(data=b64)
+        self._thumbnail_image = image
+        if hasattr(self, "_thumbnail_label"):
+            self._thumbnail_label.configure(image=image)
+        if hasattr(self, "_pipeline_thumbnail_label"):
+            self._pipeline_thumbnail_label.configure(image=image)
+
+    def _build_pipeline_tab(self) -> None:
+        frame = ttk.Frame(self.notebook)
+        self.notebook.add(frame, text="Pipeline")
+
+        ttk.Label(frame, text="Kinect Forge — Quick Scan", font=("", 13, "bold")).grid(
+            row=0, column=0, columnspan=2, sticky=tk.W, padx=12, pady=(10, 4)
+        )
+        ttk.Separator(frame, orient=tk.HORIZONTAL).grid(
+            row=1, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=4
+        )
+
+        # Step 1: Capture
+        ttk.Label(frame, text="Step 1 — Capture", font=("", 11, "bold")).grid(
+            row=2, column=0, sticky=tk.W, padx=12, pady=(8, 2)
+        )
+        self._step1_label = ttk.Label(
+            frame, textvariable=self._pipeline_step1_status, foreground="gray"
+        )
+        self._step1_label.grid(row=2, column=1, sticky=tk.W, padx=4)
+
+        capture_inner = ttk.Frame(frame)
+        capture_inner.grid(row=3, column=0, columnspan=2, sticky=tk.W, padx=20, pady=4)
+        ttk.Label(capture_inner, text="Preset:").pack(side=tk.LEFT)
+        self._pipeline_capture_preset = tk.StringVar(value="small-object")
+        ttk.Entry(capture_inner, textvariable=self._pipeline_capture_preset, width=16).pack(
+            side=tk.LEFT, padx=4
+        )
+        ttk.Label(capture_inner, text="Output:").pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Entry(capture_inner, textvariable=self.capture_output, width=14).pack(
+            side=tk.LEFT, padx=4
+        )
+
+        def pipeline_capture() -> None:
+            try:
+                from kinect_forge.sensors.freenect_v1 import FreenectV1Sensor as _S
+
+                sensor = _S()
+            except Exception as exc:  # pragma: no cover
+                self._log(f"[pipeline/capture] {exc}")
+                return
+
+            def prepare_capture_state() -> tuple[Path, CaptureConfig]:
+                preset_name = self._pipeline_capture_preset.get()
+                try:
+                    profile = capture_preset(preset_name)
+                    self.capture_fps.set(profile["fps"])
+                    self.capture_frames.set(profile["frames"])
+                    self.capture_depth_min.set(profile["depth_min"])
+                    self.capture_depth_max.set(profile["depth_max"])
+                    self.capture_mask.set(profile["mask_background"])
+                    self.capture_auto_stop.set(profile["auto_stop"])
+                except Exception:
+                    pass
+                config = CaptureConfig(
+                    frames=self.capture_frames.get(),
+                    fps=self.capture_fps.get(),
+                    warmup=self.capture_warmup.get(),
+                    mode=self.capture_mode.get().lower(),
+                    depth_min=self.capture_depth_min.get(),
+                    depth_max=self.capture_depth_max.get(),
+                    mask_background=self.capture_mask.get(),
+                    auto_stop=self.capture_auto_stop.get(),
+                )
+                return Path(self.capture_output.get()), config
+
+            output_path, config = self._call_on_ui_thread(prepare_capture_state)
+            capture_frames(sensor, output_path, config)
+
+            def mark_capture_done() -> None:
+                self._pipeline_step1_status.set("done")
+                self._step1_label.configure(foreground="green")
+
+            self.root.after(0, mark_capture_done)
+
+        ttk.Button(
+            frame,
+            text="Start Capture",
+            command=lambda: self._run_task("pipeline/capture", pipeline_capture),
+        ).grid(row=4, column=0, columnspan=2, sticky=tk.W, padx=20, pady=(0, 8))
+
+        ttk.Separator(frame, orient=tk.HORIZONTAL).grid(
+            row=5, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=4
+        )
+
+        # Step 2: Reconstruct
+        ttk.Label(frame, text="Step 2 — Build Model", font=("", 11, "bold")).grid(
+            row=6, column=0, sticky=tk.W, padx=12, pady=(8, 2)
+        )
+        self._step2_label = ttk.Label(
+            frame, textvariable=self._pipeline_step2_status, foreground="gray"
+        )
+        self._step2_label.grid(row=6, column=1, sticky=tk.W, padx=4)
+
+        recon_inner = ttk.Frame(frame)
+        recon_inner.grid(row=7, column=0, columnspan=2, sticky=tk.W, padx=20, pady=4)
+        ttk.Label(recon_inner, text="Preset:").pack(side=tk.LEFT)
+        self._pipeline_recon_preset = tk.StringVar(value="small-object")
+        ttk.Entry(recon_inner, textvariable=self._pipeline_recon_preset, width=16).pack(
+            side=tk.LEFT, padx=4
+        )
+
+        self._pipeline_progress_bar = ttk.Progressbar(
+            frame, mode="determinate", maximum=100, length=280
+        )
+        self._pipeline_progress_bar.grid(
+            row=8, column=0, columnspan=2, sticky=tk.W, padx=20, pady=2
+        )
+        self._pipeline_progress_text = tk.StringVar(value="")
+        ttk.Label(frame, textvariable=self._pipeline_progress_text).grid(
+            row=9, column=0, columnspan=2, sticky=tk.W, padx=20
+        )
+
+        def pipeline_reconstruct() -> None:
+            capture_root = self._call_on_ui_thread(self.capture_output.get)
+            if not self._dataset_ready(capture_root):
+                self._log("[pipeline/reconstruct] No dataset found. Run capture first.")
+                return
+
+            preset_name = self._call_on_ui_thread(self._pipeline_recon_preset.get)
+            try:
+                preset_cfg = reconstruction_preset(preset_name)
+            except Exception:
+                preset_cfg = reconstruction_preset("small-object")
+            output_path = Path(capture_root) / "model.ply"
+
+            def reset_progress_ui() -> None:
+                self.recon_output.set(str(output_path))
+                self._pipeline_progress_bar["value"] = 0
+                self._pipeline_progress_text.set("")
+
+            self._call_on_ui_thread(reset_progress_ui)
+
+            def on_progress(current: int, total: int) -> None:
+                pct = int(100 * current / total) if total else 0
+
+                def update_progress_ui() -> None:
+                    self._pipeline_progress_bar.configure(value=pct)
+                    self._pipeline_progress_text.set(f"Frame {current} / {total}")
+
+                self.root.after(0, update_progress_ui)
+
+            reconstruct_mesh(
+                Path(capture_root),
+                output_path,
+                preset_cfg,
+                progress_callback=on_progress,
+            )
+
+            def mark_reconstruct_done() -> None:
+                self._pipeline_step2_status.set("done")
+                self._step2_label.configure(foreground="green")
+                self._update_thumbnail(str(output_path))
+
+            self.root.after(0, mark_reconstruct_done)
+
+        ttk.Button(
+            frame,
+            text="Build Model",
+            command=lambda: self._run_task("pipeline/reconstruct", pipeline_reconstruct),
+        ).grid(row=10, column=0, columnspan=2, sticky=tk.W, padx=20, pady=(0, 8))
+
+        ttk.Separator(frame, orient=tk.HORIZONTAL).grid(
+            row=11, column=0, columnspan=2, sticky=tk.EW, padx=12, pady=4
+        )
+
+        # Step 3: View
+        ttk.Label(frame, text="Step 3 — View Model", font=("", 11, "bold")).grid(
+            row=12, column=0, sticky=tk.W, padx=12, pady=(8, 2)
+        )
+
+        self._pipeline_thumbnail_label = ttk.Label(frame)
+        self._pipeline_thumbnail_label.grid(
+            row=13, column=0, columnspan=2, sticky=tk.W, padx=20, pady=4
+        )
+
+        def pipeline_view() -> None:
+            mesh_path = Path(self.capture_output.get()) / "model.ply"
+            if mesh_path.is_file():
+                view_mesh(mesh_path)
+            else:
+                self._log("[pipeline/view] No model.ply found. Run reconstruct first.")
+
+        ttk.Button(
+            frame,
+            text="Open Viewer",
+            command=lambda: self._run_task("pipeline/view", pipeline_view),
+        ).grid(row=14, column=0, columnspan=2, sticky=tk.W, padx=20, pady=(0, 12))
+
+    def _build_status_tab(self) -> None:
+        frame = ttk.Frame(self.notebook)
+        self.notebook.add(frame, text="Status")
+
+        label = ttk.Label(frame, text="Check Kinect v1 backend status")
+        label.pack(anchor=tk.W, padx=8, pady=8)
+        env_label = ttk.Label(frame, text=f"Python: {sys.executable}")
+        env_label.pack(anchor=tk.W, padx=8, pady=2)
+        freenect_label = ttk.Label(frame, text="Freenect: checking...")
+        freenect_label.pack(anchor=tk.W, padx=8, pady=2)
+
+        try:
+            import freenect  # type: ignore
+
+            _ = freenect  # silence unused
+            freenect_label.config(text="Freenect: import OK")
+        except Exception as exc:  # pragma: no cover
+            freenect_label.config(text=f"Freenect: not available ({exc})")
+
+        def check() -> None:
+            ok = probe_device()
+            if ok:
+                self._log("Kinect v1 backend detected and streaming.")
+            else:
+                self._log(
+                    "Kinect v1 backend not detected. Install libfreenect-dev and freenect bindings. "
+                    "Ubuntu 24.04+ should use ./setup to install freenect==0.1.0."
+                )
+
+        ttk.Button(
+            frame, text="Check Status", command=lambda: self._run_task("status", check)
+        ).pack(anchor=tk.W, padx=8, pady=4)
+
+        ttk.Button(
+            frame, text="Open Live Preview", command=self._start_live_preview
+        ).pack(anchor=tk.W, padx=8, pady=4)
+
+    def _build_capture_tab(self) -> None:
+        frame = ttk.Frame(self.notebook)
+        self.notebook.add(frame, text="Capture")
 
         action_frame = ttk.Frame(frame)
         action_frame.grid(row=0, column=0, columnspan=3, sticky=tk.W, padx=8, pady=8)
@@ -281,9 +570,7 @@ class App:
         tilt_frame = ttk.Frame(action_frame)
         tilt_frame.pack(anchor=tk.W, pady=4)
         ttk.Label(tilt_frame, text="Tilt (deg):").pack(side=tk.LEFT)
-        ttk.Entry(tilt_frame, textvariable=self.capture_tilt, width=6).pack(
-            side=tk.LEFT, padx=4
-        )
+        ttk.Entry(tilt_frame, textvariable=self.capture_tilt, width=6).pack(side=tk.LEFT, padx=4)
 
         def tilt_to(angle: float) -> None:
             try:
@@ -295,18 +582,20 @@ class App:
         ttk.Button(tilt_frame, text="Set", command=lambda: tilt_to(self.capture_tilt.get())).pack(
             side=tk.LEFT, padx=4
         )
-        ttk.Button(tilt_frame, text="Up", command=lambda: tilt_to(min(30.0, self.capture_tilt.get() + 5.0))).pack(
-            side=tk.LEFT
-        )
-        ttk.Button(tilt_frame, text="Down", command=lambda: tilt_to(max(-30.0, self.capture_tilt.get() - 5.0))).pack(
-            side=tk.LEFT, padx=4
-        )
+        ttk.Button(
+            tilt_frame, text="Up", command=lambda: tilt_to(min(30.0, self.capture_tilt.get() + 5.0))
+        ).pack(side=tk.LEFT)
+        ttk.Button(
+            tilt_frame,
+            text="Down",
+            command=lambda: tilt_to(max(-30.0, self.capture_tilt.get() - 5.0)),
+        ).pack(side=tk.LEFT, padx=4)
 
         sweep_frame = ttk.Frame(action_frame)
         sweep_frame.pack(anchor=tk.W, pady=4)
-        ttk.Checkbutton(
-            sweep_frame, text="Tilt Sweep", variable=self.capture_tilt_sweep
-        ).pack(side=tk.LEFT)
+        ttk.Checkbutton(sweep_frame, text="Tilt Sweep", variable=self.capture_tilt_sweep).pack(
+            side=tk.LEFT
+        )
         ttk.Label(sweep_frame, text="Min").pack(side=tk.LEFT, padx=4)
         ttk.Entry(sweep_frame, textvariable=self.capture_tilt_min, width=5).pack(side=tk.LEFT)
         ttk.Label(sweep_frame, text="Max").pack(side=tk.LEFT, padx=4)
@@ -355,8 +644,12 @@ class App:
 
         self._path_row(frame, "Intrinsics JSON", self.capture_intrinsics, 22, is_dir=False)
 
+        ttk.Label(frame, textvariable=self._calib_status, foreground="gray").grid(
+            row=23, column=0, columnspan=3, sticky=tk.W, padx=8, pady=2
+        )
+
         preview_frame = ttk.Frame(frame)
-        preview_frame.grid(row=23, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
+        preview_frame.grid(row=24, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
         ttk.Checkbutton(
             preview_frame, text="Live Preview (Kinect)", variable=self.capture_preview
         ).pack(anchor=tk.W)
@@ -385,6 +678,79 @@ class App:
         self._preview_image = image
         self.capture_preview_label.configure(image=image)
 
+    @staticmethod
+    def _depth_to_preview_rgb(depth: np.ndarray) -> np.ndarray:
+        if depth.ndim != 2:
+            raise ValueError("depth preview expects 2D depth array")
+        depth_f = depth.astype(np.float32)
+        valid = depth_f > 0
+        if not np.any(valid):
+            return np.zeros((depth.shape[0], depth.shape[1], 3), dtype=np.uint8)
+        low = float(np.percentile(depth_f[valid], 5))
+        high = float(np.percentile(depth_f[valid], 95))
+        if high <= low:
+            high = low + 1.0
+        scaled = np.clip((depth_f - low) / (high - low), 0.0, 1.0)
+        depth_u8 = (scaled * 255.0).astype(np.uint8)
+        return np.stack([depth_u8, depth_u8, depth_u8], axis=2)
+
+    def _compose_live_preview(self, color: np.ndarray, depth: np.ndarray) -> bytes:
+        depth_rgb = self._depth_to_preview_rgb(depth)
+        combined = np.concatenate([color, depth_rgb], axis=1)
+        return self._to_ppm_bytes(combined, max_width=960)
+
+    def _close_live_preview(self) -> None:
+        self._live_preview_running = False
+        window = self._live_preview_window
+        self._live_preview_window = None
+        self._live_preview_label = None
+        self._live_preview_image = None
+        if window is not None and window.winfo_exists():
+            window.destroy()
+
+    def _update_live_preview(self, ppm: bytes) -> None:
+        if not self._live_preview_running or self._live_preview_label is None:
+            return
+        image = tk.PhotoImage(data=ppm)
+        self._live_preview_image = image
+        self._live_preview_label.configure(image=image)
+
+    def _start_live_preview(self) -> None:
+        if self._live_preview_running:
+            self._log("Live preview already open.")
+            return
+        try:
+            sensor = FreenectV1Sensor()
+        except Exception as exc:  # pragma: no cover
+            self._log(f"Live preview failed: {exc}")
+            return
+
+        window = tk.Toplevel(self.root)
+        window.title("Kinect Live Preview")
+        ttk.Label(window, text="Color | Depth").pack(anchor=tk.W, padx=8, pady=(8, 2))
+        label = ttk.Label(window)
+        label.pack(anchor=tk.W, padx=8, pady=8)
+        window.protocol("WM_DELETE_WINDOW", self._close_live_preview)
+
+        self._live_preview_window = window
+        self._live_preview_label = label
+        self._live_preview_running = True
+
+        def runner() -> None:
+            try:
+                sensor.start()
+                while self._live_preview_running:
+                    frame = sensor.get_frame()
+                    ppm = self._compose_live_preview(frame.color, frame.depth)
+                    self.root.after(0, self._update_live_preview, ppm)
+            except Exception as exc:  # pragma: no cover
+                self._log(f"Live preview error: {exc}")
+            finally:
+                sensor.stop()
+                self.root.after(0, self._close_live_preview)
+
+        threading.Thread(target=runner, daemon=True).start()
+
     def _refresh_dataset_state(self) -> None:
         capture_root = self.capture_output.get()
         dataset_ready = self._dataset_ready(capture_root)
@@ -395,11 +761,11 @@ class App:
                 self.recon_input.set(capture_root)
             if self.recon_output.get() in {"", "model.ply"}:
                 self.recon_output.set(str(Path(capture_root) / "model.ply"))
-            self.view_button.state(["!disabled"])
-            self.recon_button.state(["!disabled"])
+            self._set_widget_state(self.view_button, ["!disabled"])
+            self._set_widget_state(self.recon_button, ["!disabled"])
         else:
-            self.view_button.state(["disabled"])
-            self.recon_button.state(["disabled"])
+            self._set_widget_state(self.view_button, ["disabled"])
+            self._set_widget_state(self.recon_button, ["disabled"])
         self.root.after(1000, self._refresh_dataset_state)
 
     def _build_reconstruct_tab(self) -> None:
@@ -407,7 +773,6 @@ class App:
         self.notebook.add(frame, text="Reconstruct")
 
         self.recon_input = tk.StringVar(value="")
-        self.recon_output = tk.StringVar(value="model.ply")
         self.recon_preset = tk.StringVar(value="small")
         self.recon_voxel = tk.DoubleVar(value=0.003)
         self.recon_sdf = tk.DoubleVar(value=0.03)
@@ -418,12 +783,15 @@ class App:
         self.recon_icp_distance = tk.DoubleVar(value=0.015)
         self.recon_icp_voxel = tk.DoubleVar(value=0.008)
         self.recon_icp_iter = tk.IntVar(value=40)
+        self.recon_loop_closure = tk.BooleanVar(value=False)
         self.recon_smooth = tk.IntVar(value=5)
         self.recon_fill = tk.DoubleVar(value=0.008)
 
         self._path_row(frame, "Input Dataset", self.recon_input, 0, is_dir=True)
         self._path_row(frame, "Output Mesh", self.recon_output, 1, is_dir=False, is_save=True)
-        self._entry_row(frame, "Preset (small|medium|large|small-object|face-scan)", self.recon_preset, 2)
+        self._entry_row(
+            frame, "Preset (small|medium|large|small-object|face-scan)", self.recon_preset, 2
+        )
         self._entry_row(frame, "Voxel Length", self.recon_voxel, 3)
         self._entry_row(frame, "SDF Trunc", self.recon_sdf, 4)
         self._entry_row(frame, "Depth Scale", self.recon_depth_scale, 5)
@@ -432,7 +800,12 @@ class App:
 
         icp_frame = ttk.Frame(frame)
         icp_frame.grid(row=8, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
-        ttk.Checkbutton(icp_frame, text="ICP Refine", variable=self.recon_icp).pack(anchor=tk.W)
+        ttk.Checkbutton(icp_frame, text="ICP Refine", variable=self.recon_icp).pack(
+            side=tk.LEFT, anchor=tk.W
+        )
+        ttk.Checkbutton(icp_frame, text="Loop Closure", variable=self.recon_loop_closure).pack(
+            side=tk.LEFT, anchor=tk.W, padx=(12, 0)
+        )
 
         self._entry_row(frame, "ICP Distance", self.recon_icp_distance, 9)
         self._entry_row(frame, "ICP Voxel", self.recon_icp_voxel, 10)
@@ -453,6 +826,14 @@ class App:
             self.recon_icp_iter.set(preset_cfg.icp_iterations)
             self.recon_smooth.set(preset_cfg.smooth_iterations)
             self.recon_fill.set(preset_cfg.fill_hole_radius)
+
+        self._recon_progress_bar = ttk.Progressbar(
+            frame, mode="determinate", maximum=100, length=300
+        )
+        self._recon_progress_bar.grid(row=14, column=0, columnspan=2, padx=8, pady=4, sticky=tk.W)
+        ttk.Label(frame, textvariable=self._recon_progress_text).grid(
+            row=15, column=0, columnspan=2, padx=8, sticky=tk.W
+        )
 
         def run_reconstruct() -> None:
             if not self._require_dataset(self.recon_input.get(), "reconstruct"):
@@ -478,22 +859,32 @@ class App:
                 icp_distance=self.recon_icp_distance.get(),
                 icp_voxel=self.recon_icp_voxel.get(),
                 icp_iterations=self.recon_icp_iter.get(),
+                loop_closure=self.recon_loop_closure.get(),
                 smooth_iterations=self.recon_smooth.get(),
                 fill_hole_radius=self.recon_fill.get(),
                 preset=self.recon_preset.get(),
             )
-            reconstruct_mesh(Path(self.recon_input.get()), output_path, config)
+            self.root.after(0, self._update_recon_progress, 0, 0, 0)
+
+            def on_progress(current: int, total: int) -> None:
+                pct = int(100 * current / total) if total else 0
+                self.root.after(0, self._update_recon_progress, current, total, pct)
+
+            reconstruct_mesh(
+                Path(self.recon_input.get()), output_path, config, progress_callback=on_progress
+            )
+            self.root.after(0, self._update_thumbnail, str(output_path))
 
         self.recon_button = ttk.Button(
             frame,
             text="Reconstruct",
             command=lambda: self._run_task("reconstruct", run_reconstruct),
         )
-        self.recon_button.grid(row=14, column=0, padx=8, pady=8, sticky=tk.W)
-        self.recon_button.state(["disabled"])
+        self.recon_button.grid(row=16, column=0, padx=8, pady=8, sticky=tk.W)
+        self._set_widget_state(self.recon_button, ["disabled"])
 
         ttk.Button(frame, text="Apply Preset", command=apply_preset).grid(
-            row=14, column=1, padx=8, pady=8, sticky=tk.W
+            row=16, column=1, padx=8, pady=8, sticky=tk.W
         )
 
     def _build_measure_tab(self) -> None:
@@ -522,9 +913,9 @@ class App:
             if measurements.volume is not None:
                 self._log(f"Volume (m^3): {measurements.volume:.6f}")
 
-        ttk.Button(frame, text="Measure", command=lambda: self._run_task("measure", run_measure)).grid(
-            row=1, column=0, padx=8, pady=8, sticky=tk.W
-        )
+        ttk.Button(
+            frame, text="Measure", command=lambda: self._run_task("measure", run_measure)
+        ).grid(row=1, column=0, padx=8, pady=8, sticky=tk.W)
 
     def _build_view_tab(self) -> None:
         frame = ttk.Frame(self.notebook)
@@ -550,7 +941,10 @@ class App:
             frame, text="Open Viewer", command=lambda: self._run_task("view", run_view)
         )
         self.view_button.grid(row=3, column=0, padx=8, pady=8, sticky=tk.W)
-        self.view_button.state(["disabled"])
+        self._set_widget_state(self.view_button, ["disabled"])
+
+        self._thumbnail_label = ttk.Label(frame)
+        self._thumbnail_label.grid(row=4, column=0, columnspan=3, sticky=tk.W, padx=8, pady=4)
 
     def _build_calibrate_tab(self) -> None:
         frame = ttk.Frame(self.notebook)
@@ -576,6 +970,7 @@ class App:
             save_intrinsics(Path(self.calib_output.get()), intrinsics)
             self._log(f"Intrinsics saved to {self.calib_output.get()}")
             self._log(json.dumps(asdict(intrinsics), indent=2))
+            self.root.after(0, self._refresh_calib_status)
 
         ttk.Button(
             frame, text="Calibrate", command=lambda: self._run_task("calibrate", run_calibrate)

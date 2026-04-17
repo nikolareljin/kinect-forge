@@ -72,6 +72,7 @@ class ReconstructionConfig:
     icp_distance: float = 0.02
     icp_voxel: float = 0.01
     icp_iterations: int = 30
+    loop_closure: bool = False
     smooth_iterations: int = 0
     fill_hole_radius: float = 0.0
     preset: str = "small"

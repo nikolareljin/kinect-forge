@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, cast
 
 import open3d as o3d
 import numpy as np
@@ -43,5 +43,5 @@ def _bbox_extent(bbox: object) -> np.ndarray:
     max_bound = getattr(bbox, "get_max_bound", None)
     min_bound = getattr(bbox, "get_min_bound", None)
     if callable(max_bound) and callable(min_bound):
-        return np.asarray(max_bound()) - np.asarray(min_bound())
+        return cast(np.ndarray, np.asarray(max_bound()) - np.asarray(min_bound()))
     raise AttributeError("Bounding box does not expose an extent method or attribute.")

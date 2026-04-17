@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kinect-forge"
-version = "0.1.0"
+version = "0.2.0"
 description = "Kinect-based 3D scanning toolkit for Ubuntu"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -45,4 +45,8 @@ strict = true
 
 [[tool.mypy.overrides]]
 module = ["open3d", "open3d.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["freenect"]
 ignore_missing_imports = true
