@@ -161,3 +161,11 @@ python -m kinect_forge capture --output scans/calibrated --frames 200 --intrinsi
 
 ## Roadmap
 See `docs/ROADMAP.md`.
+
+---
+
+## Clone traffic
+
+![Clone traffic](https://raw.githubusercontent.com/nikolareljin/stats/main/charts/kinect-forge.svg)
+
+_Updated daily. Total and unique cloners over the last 14 days._
