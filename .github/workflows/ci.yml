@@ -29,4 +29,4 @@ jobs:
       working_directory: "."
       extra_command: "./update"
       lint_command: "./lint"
-      test_command: "./test"
+      test_command: "./scripts/ci_system_deps.sh && ./test"

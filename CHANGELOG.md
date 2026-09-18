@@ -2,6 +2,12 @@
 
 ## Unreleased
 ### Fixed
+- **CI could not import Open3D at all.** `import open3d` links EGL at import time,
+  so it raised `ImportError: libEGL.so.1` on a bare GitHub runner. The suite hid
+  this behind `pytest.importorskip("open3d")` — every Open3D test skipped, which is
+  why the reconstruction code shipped with the pose bug above. `scripts/ci_system_deps.sh`
+  installs the libraries and runs ahead of `./test`. It cannot hang off
+  `extra_command`, because ci-helpers runs the `Extra` step *after* `Test`.
 - **Every reconstruction fused each surface twice.** `reconstruct.py` mixed two
   opposite pose conventions. `_estimate_poses` accumulates RGBD odometry into
   **world-to-camera** matrices, but `_refine_poses_icp`, `_estimate_turntable_poses`
