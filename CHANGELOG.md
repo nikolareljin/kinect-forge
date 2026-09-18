@@ -2,6 +2,11 @@
 
 ## Unreleased
 ### Fixed
+- **The packaging workflow could never have started.** `release-build.yml`
+  declares `contents: write`, this repository's default workflow token is `read`,
+  and `package.yml` granted nothing — so GitHub refused the run before any step,
+  as `startup_failure`. Pushing `0.2.0`, the first tag ever to reach the workflow,
+  is what surfaced it.
 - **Merging a release branch tagged nothing.** Only `ci.yml` runs on a push to
   `main`, and `package.yml` triggers *on* a tag, so nothing in this repository
   could ever create one — 0.2.0 reached `main` untagged for that reason. The
