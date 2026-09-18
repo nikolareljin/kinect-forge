@@ -29,4 +29,7 @@ jobs:
       working_directory: "."
       extra_command: "./update"
       lint_command: "./lint"
-      test_command: "./scripts/ci_system_deps.sh && ./test"
+      # ./deps is the same script a user runs as step 1, so CI installs exactly
+      # what an install installs. It must run before Test rather than as
+      # extra_command, because ci-helpers runs the Extra step after Test.
+      test_command: "./deps && ./test"

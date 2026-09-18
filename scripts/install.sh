@@ -63,16 +63,10 @@ if ! command -v sudo >/dev/null 2>&1; then
 fi
 
 if $INSTALL_SYSTEM_DEPS; then
-  if command -v apt-get >/dev/null 2>&1; then
-    log_info "Installing system dependencies (libfreenect, tk, build tools)..."
-    sudo apt update
-    sudo apt install -y libfreenect-dev python3-tk build-essential pkg-config cmake
-    if ! sudo apt install -y python3-freenect; then
-      log_info "python3-freenect not available via apt. Will use pip package fallback."
-    fi
-  else
-    log_warn "System deps install skipped (apt-get not found)."
-  fi
+  # Step 1: system packages, from the single list in scripts/deps.sh. Pass
+  # --no-system-deps to skip when ./deps has already been run.
+  log_info "Installing system dependencies..."
+  "$ROOT_DIR/scripts/deps.sh"
 fi
 
 if $INSTALL_UDEV; then

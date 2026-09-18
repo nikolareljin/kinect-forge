@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
+# SCRIPT: package.sh
+# DESCRIPTION: Build the wheel and sdist published as release assets.
+# USAGE: ./scripts/package.sh
+# PARAMETERS: None
+# EXAMPLE: ./scripts/package.sh
+#
+# This is what a release ships: two files of roughly 33 KB. `pip install` then
+# resolves open3d, opencv and the rest from PyPI, where they are cached once per
+# machine.
+#
+# It deliberately does not ship a frozen bundle. scripts/bundle.sh still builds
+# one for local use, but open3d's libOpen3D.so alone is 768 MB, so the archive
+# lands near 500 MB per release and cannot be trimmed to a sensible size.
+# ----------------------------------------------------
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$ROOT_DIR/scripts/include.sh" "$@"
 cd "$ROOT_DIR"
 
-# PyInstaller was invoked without ever being installed, so this script could only
-# work on a machine where someone had installed it by hand. It also needs the
-# project importable: it builds from src/kinect_forge/__main__.py and collects
-# open3d's submodules. The `packaging` extra in pyproject.toml exists for exactly
-# this and nothing had ever installed it.
-#
-# Same venv layout as lint.sh and test.sh, so all three behave identically here
-# and in CI.
 VENV_DIR="${VENV_DIR:-$ROOT_DIR/.venv}"
 if [ ! -d "$VENV_DIR" ]; then
   python3 -m venv "$VENV_DIR"
@@ -23,25 +29,11 @@ source "$VENV_DIR/bin/activate"
 python -m pip install --upgrade pip
 python -m pip install -e "$ROOT_DIR"[packaging]
 
-python -m PyInstaller \
-  --noconfirm \
-  --windowed \
-  --name kinect-forge \
-  --add-data "docs:docs" \
-  --collect-submodules open3d \
-  --hidden-import tkinter \
-  --hidden-import tkinter.ttk \
-  src/kinect_forge/__main__.py
+# A stale dist/ would be published alongside the new files, including a bundle
+# left behind by scripts/bundle.sh.
+rm -rf "$ROOT_DIR/dist"
 
-# PyInstaller's COLLECT build is a directory tree -- 6424 files and 1.3 GB for
-# this project, because --collect-submodules open3d pulls in the whole library.
-# package.yml uploads `artifact_paths` as GitHub release assets, so publishing
-# the tree directly would attach every one of those files individually. Ship one
-# archive instead.
-VERSION=$(python -c "import tomllib, pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
-PLATFORM="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)"
-TARBALL="kinect-forge-${VERSION}-${PLATFORM}.tar.gz"
+python -m build --outdir "$ROOT_DIR/dist"
 
-tar -czf "dist/${TARBALL}" -C dist kinect-forge
-
-echo "Built package under dist/${TARBALL}"
+echo "Built distributables under dist/:"
+ls -lh "$ROOT_DIR/dist"

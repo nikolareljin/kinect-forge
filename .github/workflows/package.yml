@@ -33,8 +33,8 @@ jobs:
       python_version: "3.12"
       working_directory: "."
       build_command: "./update && ./scripts/package.sh"
-      # The single archive built by scripts/package.sh, not "dist/**" -- that
-      # glob matches every file inside PyInstaller's COLLECT tree and would
-      # attach thousands of them to the release one by one.
-      artifact_paths: "dist/*.tar.gz"
+      # The wheel and sdist, about 33 KB each. This was "dist/**" against a
+      # PyInstaller build: 6424 files and 1.3 GB, every one of them attached to
+      # the release individually.
+      artifact_paths: "dist/*"
       upload_artifact: true

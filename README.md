@@ -100,14 +100,21 @@ Cross-platform GUI: Tkinter works on Linux/Windows/macOS, but Kinect v1 capture 
 
 ## Scripts
 ```bash
-./update   # init/update submodules
-./setup    # install system deps + create venv + install python deps
-./install  # install system venv + CLI symlink (testing)
-./uninstall # remove system install
-./lint     # ruff + mypy
-./test     # pytest
-./scripts/package.sh   # build PyInstaller package (Linux/macOS)
-./scripts/package.ps1  # build PyInstaller package (Windows)
+# Installing, in two steps
+./deps        # 1. system dependencies (apt packages)
+./install     # 2. the app itself, into /opt/kinect-forge, plus a CLI symlink
+./uninstall   # remove a system install
+
+# Working on it
+./setup       # development checkout: ./deps, then a local .venv with dev extras
+./update      # init/update submodules
+./lint        # ruff + mypy
+./test        # pytest
+
+# Building artifacts
+./scripts/package.sh   # the wheel + sdist a release publishes (~76 KB)
+./scripts/bundle.sh    # a local standalone bundle (~500 MB, never released)
+./scripts/bundle.ps1   # the same standalone bundle, on Windows
 ```
 
 ## Documentation
