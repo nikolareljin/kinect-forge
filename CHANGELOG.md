@@ -2,6 +2,9 @@
 
 ## Unreleased
 ### Fixed
+- **Tagging a release the way this repository tags would not have built one.**
+  `package.yml` triggered on `v*`, but the only tag here is `0.1.0` — bare, no
+  prefix. The trigger now matches the convention actually in use.
 - **CI could not import Open3D at all.** `import open3d` links EGL at import time,
   so it raised `ImportError: libEGL.so.1` on a bare GitHub runner. The suite hid
   this behind `pytest.importorskip("open3d")` — every Open3D test skipped, which is

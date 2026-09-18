@@ -4,7 +4,10 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - "v*"
+      # This repository tags bare, without a "v" prefix: 0.1.0, not v0.1.0.
+      # The trigger was "v*", so a tag following the repository's own convention
+      # would never have built a release.
+      - "[0-9]*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
