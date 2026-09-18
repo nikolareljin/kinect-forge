@@ -1,0 +1,44 @@
+name: Auto Tag Release
+
+# Merging a `release/X.Y.Z` pull request into main creates the `X.Y.Z` tag.
+#
+# Without this, merging a release branch tagged nothing: only `ci.yml` runs on a
+# push to main, and `package.yml` triggers *on* a tag, so it can never create one.
+# 0.2.0 reached main untagged for exactly that reason. The other repositories in
+# this workspace have carried an `auto-tag-release.yml` for some time; this one
+# was onboarded to the shared workflows with lint/test and packaging only.
+#
+# Two deliberate choices:
+#
+#   * `auto-tag.yml`, not `auto-tag-release.yml`, from ci-helpers. The latter adds
+#     a dispatch job that statically declares `actions: write`, and GitHub
+#     validates a reusable workflow's permissions before running it, so every
+#     caller must grant that scope even when the job is skipped. Nothing here
+#     needs the dispatch: `package.yml` already fires on the tag and publishes the
+#     GitHub Release with its artifacts.
+#
+#   * `update_production_tag: false`. That step runs `./scripts/create_production.sh`
+#     to advance a floating `production` ref. This repository has neither the
+#     script nor the tag, and the step would fail after the tag had already been
+#     pushed — leaving a red run behind a correct tag.
+#
+# Tags are bare, without a `v` prefix (0.1.0, not v0.1.0). The shared workflow
+# creates them that way, which matches `package.yml`'s trigger pattern.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: auto-tag-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    uses: nikolareljin/ci-helpers/.github/workflows/auto-tag.yml@production
+    with:
+      update_production_tag: false

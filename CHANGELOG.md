@@ -2,6 +2,14 @@
 
 ## Unreleased
 ### Fixed
+- **Merging a release branch tagged nothing.** Only `ci.yml` runs on a push to
+  `main`, and `package.yml` triggers *on* a tag, so nothing in this repository
+  could ever create one — 0.2.0 reached `main` untagged for that reason. The
+  sibling repositories in this workspace have carried an `auto-tag-release.yml`
+  for some time; this one was onboarded to the shared workflows with lint/test
+  and packaging only. Added, calling ci-helpers' tag-only `auto-tag.yml` with
+  `update_production_tag: false`, since this repository has no floating
+  `production` ref and `package.yml` already publishes the release.
 - **Tagging a release the way this repository tags would not have built one.**
   `package.yml` triggered on `v*`, but the only tag here is `0.1.0` — bare, no
   prefix. The trigger now matches the convention actually in use.
