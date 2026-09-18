@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kinect-forge"
-version = "0.1.0"
+version = "0.2.0"
 description = "Kinect-based 3D scanning toolkit for Ubuntu"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -21,6 +21,10 @@ dependencies = [
   "trimesh>=4.4",
   "typer>=0.12",
   "rich>=13.7",
+  # viewer.py imports plotly.graph_objects directly. It was reaching the
+  # environment only through open3d -> dash -> plotly, so the import worked by
+  # accident and would break the day open3d dropped dash.
+  "plotly>=5",
 ]
 
 [project.optional-dependencies]
@@ -39,10 +43,56 @@ kinect-forge = "kinect_forge.cli:app"
 [tool.ruff]
 line-length = 100
 
+[tool.ruff.lint]
+# Pinned explicitly. With no `select`, the repo inherited ruff's defaults, and
+# ruff 0.16 widened them -- 147 errors appeared in CI without a line of this
+# code changing, because `pyproject.toml` asks for `ruff>=0.6` and pip installs
+# whatever is newest. A lint that depends on a tool's default is not a lint you
+# can reproduce.
+#
+# This set is wider than the pre-0.16 default (E4/E7/E9/F): it adds import
+# sorting, pyupgrade modernisations, bugbear and comprehension checks, all of
+# which are largely auto-fixable.
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "C4"]
+
+# BLE (blind except), TRY and S are deliberately not selected yet. They flag 17
+# real smells here that each need a judgement about what the right exception or
+# log line is, which is a change of its own rather than part of a release PR.
+ignore = [
+  # typer's documented idiom is a call in the argument default --
+  # `x: int = typer.Option(...)`. Ruff documents the exception for typer and
+  # FastAPI. Every one of the 9 hits is that pattern in cli.py.
+  "B008",
+]
+
 [tool.mypy]
-python_version = "3.10"
+# 3.12, not the 3.10 in `requires-python`. numpy 2.3+ writes its stubs with
+# PEP 695 `type` statements, which mypy refuses to read when asked to analyse
+# as anything older -- it stops at `numpy/__init__.pyi` before checking a line
+# of this project. CI runs 3.12, so this matches what is actually executed.
+#
+# The cost is real and worth knowing: `requires-python = ">=3.10"` is no longer
+# verified by the type checker. Either pin numpy below 2.3 or raise the floor
+# to 3.12 to make the claim honest again.
+python_version = "3.12"
 strict = true
 
 [[tool.mypy.overrides]]
 module = ["open3d", "open3d.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["freenect"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# None of these ship a py.typed marker or have typeshed stubs, so strict mode
+# rejects every import of them. open3d and freenect were already listed; the
+# rest are imported by the same modules and were missing.
+module = [
+  "plotly", "plotly.*",
+  "cv2",
+  "trimesh", "trimesh.*",
+  "imageio", "imageio.*",
+]
 ignore_missing_imports = true

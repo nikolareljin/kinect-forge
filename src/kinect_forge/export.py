@@ -35,5 +35,5 @@ def write_mesh(path: Path, mesh: o3d.geometry.TriangleMesh) -> None:
         tm.export(str(path))
         return
 
-    if not o3d.io.write_triangle_mesh(str(path), mesh):
+    if not o3d.io.write_triangle_mesh(path, mesh):
         raise RuntimeError("Failed to write mesh output.")

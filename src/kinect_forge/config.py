@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -13,11 +13,11 @@ class KinectIntrinsics:
     cx: float = 319.5
     cy: float = 239.5
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @staticmethod
-    def from_dict(payload: Dict[str, Any]) -> "KinectIntrinsics":
+    def from_dict(payload: dict[str, Any]) -> KinectIntrinsics:
         return KinectIntrinsics(
             width=int(payload["width"]),
             height=int(payload["height"]),
@@ -56,9 +56,9 @@ class CaptureConfig:
     tilt_max: float = 10.0
     tilt_step: float = 5.0
     tilt_hold_frames: int = 30
-    turntable_model: Optional[str] = None
-    turntable_diameter_mm: Optional[int] = None
-    turntable_rotation_seconds: Optional[float] = None
+    turntable_model: str | None = None
+    turntable_diameter_mm: int | None = None
+    turntable_rotation_seconds: float | None = None
 
 
 @dataclass(frozen=True)
@@ -72,6 +72,7 @@ class ReconstructionConfig:
     icp_distance: float = 0.02
     icp_voxel: float = 0.01
     icp_iterations: int = 30
+    loop_closure: bool = False
     smooth_iterations: int = 0
     fill_hole_radius: float = 0.0
     preset: str = "small"

@@ -1,36 +1,50 @@
 from __future__ import annotations
 
+import json
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any
 
 import cv2
 import imageio.v3 as iio
 import numpy as np
+import numpy.typing as npt
 
 from kinect_forge.config import CaptureConfig, KinectIntrinsics
 from kinect_forge.dataset import DatasetMeta, ensure_dirs, write_metadata
 from kinect_forge.sensors.base import Sensor
 
 
-def _write_color(path: Path, color: np.ndarray) -> None:
+def _find_default_calibration() -> KinectIntrinsics | None:
+    """Load calibration.json from cwd if present, return None otherwise."""
+    candidate = Path.cwd() / "calibration.json"
+    if candidate.is_file():
+        try:
+            return KinectIntrinsics.from_dict(json.loads(candidate.read_text()))
+        except Exception:
+            return None
+    return None
+
+
+def _write_color(path: Path, color: npt.NDArray[Any]) -> None:
     iio.imwrite(path, color, extension=".png")
 
 
-def _write_depth(path: Path, depth: np.ndarray) -> None:
+def _write_depth(path: Path, depth: npt.NDArray[Any]) -> None:
     if depth.dtype != np.uint16:
         depth = depth.astype(np.uint16)
     iio.imwrite(path, depth, extension=".png")
 
 
 def _apply_depth_mask(
-    color: np.ndarray,
-    depth: np.ndarray,
+    color: npt.NDArray[Any],
+    depth: npt.NDArray[Any],
     depth_min: float,
     depth_max: float,
     depth_scale: float,
     mask_background: bool,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[npt.NDArray[Any], npt.NDArray[Any]]:
     depth_m = depth.astype(np.float32) / depth_scale
     mask = (depth_m >= depth_min) & (depth_m <= depth_max)
     if mask_background:
@@ -42,8 +56,8 @@ def _apply_depth_mask(
 
 
 def _apply_roi(
-    color: np.ndarray, depth: np.ndarray, x: int, y: int, w: int, h: int
-) -> tuple[np.ndarray, np.ndarray]:
+    color: npt.NDArray[Any], depth: npt.NDArray[Any], x: int, y: int, w: int, h: int
+) -> tuple[npt.NDArray[Any], npt.NDArray[Any]]:
     if w <= 0 or h <= 0:
         return color, depth
     x0 = max(x, 0)
@@ -58,11 +72,11 @@ def _apply_roi(
 
 
 def _apply_color_mask(
-    color: np.ndarray,
-    depth: np.ndarray,
+    color: npt.NDArray[Any],
+    depth: npt.NDArray[Any],
     hsv_lower: tuple[int, int, int],
     hsv_upper: tuple[int, int, int],
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[npt.NDArray[Any], npt.NDArray[Any]]:
     hsv = cv2.cvtColor(color, cv2.COLOR_RGB2HSV)
     lower = np.array(hsv_lower, dtype=np.uint8)
     upper = np.array(hsv_upper, dtype=np.uint8)
@@ -78,19 +92,32 @@ def capture_frames(
     sensor: Sensor,
     output_dir: Path,
     config: CaptureConfig,
-    intrinsics: Optional[KinectIntrinsics] = None,
-    preview_cb: Optional[Callable[[np.ndarray, np.ndarray], None]] = None,
-    tilt_cb: Optional[Callable[[float], None]] = None,
+    intrinsics: KinectIntrinsics | None = None,
+    preview_cb: Callable[[npt.NDArray[Any], npt.NDArray[Any]], None] | None = None,
+    tilt_cb: Callable[[float], None] | None = None,
 ) -> None:
     if config.mode not in {"standard", "turntable"}:
         raise ValueError("mode must be 'standard' or 'turntable'")
     output_dir.mkdir(parents=True, exist_ok=True)
     color_dir, depth_dir = ensure_dirs(output_dir)
-    intrinsics = intrinsics or KinectIntrinsics()
+    if intrinsics is None:
+        intrinsics = _find_default_calibration() or KinectIntrinsics()
+    sensor_depth_scale = getattr(sensor, "depth_scale", None)
+    sensor_depth_format = getattr(getattr(sensor, "_config", None), "depth_format", "mm")
+    # For 11bit depth, sensor.depth_scale is 1.0 (raw units), which is not meaningful as
+    # a mm-conversion factor for downstream consumers. Fall back to config.depth_scale so
+    # masking thresholds and metadata stay consistent with what reconstruct_mesh expects.
+    effective_depth_scale = (
+        float(sensor_depth_scale)
+        if sensor_depth_scale is not None and sensor_depth_format != "11bit"
+        else config.depth_scale
+    )
     meta = DatasetMeta(
         intrinsics=intrinsics,
-        depth_scale=config.depth_scale,
+        depth_scale=effective_depth_scale,
         depth_trunc=config.depth_trunc,
+        capture_mode=config.mode,
+        depth_format=sensor_depth_format,
         turntable_model=config.turntable_model,
         turntable_diameter_mm=config.turntable_diameter_mm,
         turntable_rotation_seconds=config.turntable_rotation_seconds,
@@ -107,7 +134,7 @@ def capture_frames(
         last_ts = time.monotonic()
         saved = 0
         total = 0
-        last_saved_depth: Optional[np.ndarray] = None
+        last_saved_depth: npt.NDArray[Any] | None = None
         stagnant = 0
         tilt_angle = config.tilt_min
         tilt_dir = 1.0
@@ -124,20 +151,18 @@ def capture_frames(
                 frame.depth,
                 config.depth_min,
                 config.depth_max,
-                config.depth_scale,
+                effective_depth_scale,
                 config.mask_background,
             )
             color, depth = _apply_roi(
                 color, depth, config.roi_x, config.roi_y, config.roi_w, config.roi_h
             )
             if config.color_mask:
-                color, depth = _apply_color_mask(
-                    color, depth, config.hsv_lower, config.hsv_upper
-                )
+                color, depth = _apply_color_mask(color, depth, config.hsv_lower, config.hsv_upper)
             save_frame = True
             if config.mode == "turntable" and last_saved_depth is not None:
-                depth_m = depth.astype(np.float32) / config.depth_scale
-                last_m = last_saved_depth.astype(np.float32) / config.depth_scale
+                depth_m = depth.astype(np.float32) / effective_depth_scale
+                last_m = last_saved_depth.astype(np.float32) / effective_depth_scale
                 delta = np.mean(np.abs(depth_m - last_m))
                 save_frame = bool(delta >= config.change_threshold)
 
@@ -161,8 +186,8 @@ def capture_frames(
                     next_tilt_at = saved + max(1, config.tilt_hold_frames)
             elif config.auto_stop and config.mode == "turntable":
                 if last_saved_depth is not None:
-                    depth_m = depth.astype(np.float32) / config.depth_scale
-                    last_m = last_saved_depth.astype(np.float32) / config.depth_scale
+                    depth_m = depth.astype(np.float32) / effective_depth_scale
+                    last_m = last_saved_depth.astype(np.float32) / effective_depth_scale
                     delta = np.mean(np.abs(depth_m - last_m))
                     if delta < config.auto_stop_delta:
                         stagnant += 1

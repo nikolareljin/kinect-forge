@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from kinect_forge.config import KinectIntrinsics
 
@@ -13,26 +13,30 @@ class DatasetMeta:
     intrinsics: KinectIntrinsics
     depth_scale: float
     depth_trunc: float
+    capture_mode: str = "standard"
     color_format: str = "rgb"
     depth_unit: str = "mm"
-    turntable_model: Optional[str] = None
-    turntable_diameter_mm: Optional[int] = None
-    turntable_rotation_seconds: Optional[float] = None
+    depth_format: str = "mm"
+    turntable_model: str | None = None
+    turntable_diameter_mm: int | None = None
+    turntable_rotation_seconds: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "intrinsics": self.intrinsics.to_dict(),
             "depth_scale": self.depth_scale,
             "depth_trunc": self.depth_trunc,
+            "capture_mode": self.capture_mode,
             "color_format": self.color_format,
             "depth_unit": self.depth_unit,
+            "depth_format": self.depth_format,
             "turntable_model": self.turntable_model,
             "turntable_diameter_mm": self.turntable_diameter_mm,
             "turntable_rotation_seconds": self.turntable_rotation_seconds,
         }
 
 
-def ensure_dirs(root: Path) -> Tuple[Path, Path]:
+def ensure_dirs(root: Path) -> tuple[Path, Path]:
     color_dir = root / "color"
     depth_dir = root / "depth"
     color_dir.mkdir(parents=True, exist_ok=True)
@@ -52,19 +56,21 @@ def load_metadata(root: Path) -> DatasetMeta:
         intrinsics=intrinsics,
         depth_scale=float(payload["depth_scale"]),
         depth_trunc=float(payload["depth_trunc"]),
+        capture_mode=payload.get("capture_mode", "standard"),
         color_format=payload.get("color_format", "rgb"),
         depth_unit=payload.get("depth_unit", "mm"),
+        depth_format=payload.get("depth_format", "mm"),
         turntable_model=payload.get("turntable_model"),
         turntable_diameter_mm=payload.get("turntable_diameter_mm"),
         turntable_rotation_seconds=payload.get("turntable_rotation_seconds"),
     )
 
 
-def list_frame_pairs(root: Path) -> List[Tuple[Path, Path]]:
+def list_frame_pairs(root: Path) -> list[tuple[Path, Path]]:
     color_dir = root / "color"
     depth_dir = root / "depth"
     color_files = sorted(color_dir.glob("color_*.png"))
-    pairs: List[Tuple[Path, Path]] = []
+    pairs: list[tuple[Path, Path]] = []
     for color in color_files:
         idx = color.stem.split("_")[-1]
         depth = depth_dir / f"depth_{idx}.png"

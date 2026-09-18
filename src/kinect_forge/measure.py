@@ -2,21 +2,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any
 
-import open3d as o3d
 import numpy as np
+import numpy.typing as npt
+import open3d as o3d
 
 
 @dataclass(frozen=True)
 class MeshMeasurements:
-    axis_aligned: Tuple[float, float, float]
-    oriented: Tuple[float, float, float]
-    volume: Optional[float]
+    axis_aligned: tuple[float, float, float]
+    oriented: tuple[float, float, float]
+    volume: float | None
 
 
 def measure_mesh(mesh_path: Path) -> MeshMeasurements:
-    mesh = o3d.io.read_triangle_mesh(str(mesh_path))
+    mesh = o3d.io.read_triangle_mesh(mesh_path)
     if mesh.is_empty():
         raise RuntimeError("Mesh is empty or could not be read.")
     aabb = mesh.get_axis_aligned_bounding_box()
@@ -33,7 +34,7 @@ def measure_mesh(mesh_path: Path) -> MeshMeasurements:
     )
 
 
-def _bbox_extent(bbox: object) -> np.ndarray:
+def _bbox_extent(bbox: object) -> npt.NDArray[Any]:
     get_extent = getattr(bbox, "get_extent", None)
     if callable(get_extent):
         return np.asarray(get_extent())

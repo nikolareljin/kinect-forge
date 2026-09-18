@@ -8,6 +8,35 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$ROOT_DIR/scripts/include.sh" "$@"
+FREENECT_PIP_SPEC="${FREENECT_PIP_SPEC:-freenect==0.1.0}"
+
+choose_python_bin() {
+  if command -v python3 >/dev/null 2>&1; then
+    command -v python3
+    return 0
+  fi
+
+  if command -v python >/dev/null 2>&1; then
+    command -v python
+    return 0
+  fi
+
+  return 1
+}
+
+has_freenect_module() {
+  local python_bin="$1"
+  "$python_bin" - <<'PYEOF'
+import importlib.util
+raise SystemExit(0 if importlib.util.find_spec("freenect") else 1)
+PYEOF
+}
+
+install_freenect_bindings() {
+  local python_bin="$1"
+  log_info "Installing freenect Python bindings via pip package $FREENECT_PIP_SPEC..."
+  sudo "$VENV_DIR/bin/pip" install --upgrade "$FREENECT_PIP_SPEC"
+}
 
 INSTALL_ROOT="${INSTALL_ROOT:-/opt/kinect-forge}"
 VENV_DIR="${VENV_DIR:-$INSTALL_ROOT/venv}"
@@ -39,8 +68,7 @@ if $INSTALL_SYSTEM_DEPS; then
     sudo apt update
     sudo apt install -y libfreenect-dev python3-tk build-essential pkg-config cmake
     if ! sudo apt install -y python3-freenect; then
-      log_warn "python3-freenect not available via apt. Kinect v1 capture may be unavailable."
-      log_warn "Will attempt to install freenect via pip into the system venv."
+      log_info "python3-freenect not available via apt. Will use pip package fallback."
     fi
   else
     log_warn "System deps install skipped (apt-get not found)."
@@ -56,12 +84,7 @@ if $INSTALL_UDEV; then
   fi
 fi
 
-PYTHON_BIN=""
-if command -v python3 >/dev/null 2>&1; then
-  PYTHON_BIN="$(command -v python3)"
-elif command -v python >/dev/null 2>&1; then
-  PYTHON_BIN="$(command -v python)"
-fi
+PYTHON_BIN="$(choose_python_bin || true)"
 
 if [[ -z "$PYTHON_BIN" ]]; then
   log_error "python3 is required to install kinect-forge."
@@ -89,14 +112,9 @@ else
   sudo "$VENV_DIR/bin/pip" install --upgrade "$ROOT_DIR"
 fi
 
-if ! sudo "$VENV_DIR/bin/python" - <<'PYEOF'
-import importlib
-raise SystemExit(0 if importlib.util.find_spec("freenect") else 1)
-PYEOF
-then
-  log_warn "freenect bindings not detected in system venv. Installing via pip..."
-  if ! sudo "$VENV_DIR/bin/pip" install freenect; then
-    log_warn "pip install freenect failed. See docs/SETUP.md for manual steps."
+if ! has_freenect_module "$VENV_DIR/bin/python"; then
+  if ! install_freenect_bindings "$VENV_DIR/bin/python"; then
+    log_warn "freenect pip install failed. See docs/SETUP.md for manual steps."
   fi
 fi
 
