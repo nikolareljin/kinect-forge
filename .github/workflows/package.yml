@@ -33,5 +33,8 @@ jobs:
       python_version: "3.12"
       working_directory: "."
       build_command: "./update && ./scripts/package.sh"
-      artifact_paths: "dist/**"
+      # The single archive built by scripts/package.sh, not "dist/**" -- that
+      # glob matches every file inside PyInstaller's COLLECT tree and would
+      # attach thousands of them to the release one by one.
+      artifact_paths: "dist/*.tar.gz"
       upload_artifact: true
