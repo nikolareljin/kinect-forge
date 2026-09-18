@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple, cast
+from typing import Any, Callable, List, Optional, Tuple, cast
 
 import numpy as np
+import numpy.typing as npt
 import open3d as o3d
 
 from kinect_forge.config import ReconstructionConfig
@@ -32,8 +33,8 @@ def _rgbd_from_paths(
 def _estimate_poses(
     rgbd_images: List[o3d.geometry.RGBDImage],
     intrinsic: o3d.camera.PinholeCameraIntrinsic,
-) -> List[np.ndarray]:
-    poses: List[np.ndarray] = [np.eye(4)]
+) -> List[npt.NDArray[Any]]:
+    poses: List[npt.NDArray[Any]] = [np.eye(4)]
     odom_jacobian = o3d.pipelines.odometry.RGBDOdometryJacobianFromHybridTerm()
     for idx in range(1, len(rgbd_images)):
         success, trans, _ = o3d.pipelines.odometry.compute_rgbd_odometry(
@@ -58,7 +59,7 @@ def _select_keyframes(
         return pairs
 
     selected: List[Tuple[Path, Path]] = []
-    last_depth: np.ndarray | None = None
+    last_depth: npt.NDArray[Any] | None = None
     for color_path, depth_path in pairs:
         depth = o3d.io.read_image(str(depth_path))
         depth_arr = np.asarray(depth).astype(np.float32) / depth_scale
@@ -106,12 +107,12 @@ def _rgbd_to_pcd(
 def _refine_poses_icp(
     rgbd_images: List[o3d.geometry.RGBDImage],
     intrinsic: o3d.camera.PinholeCameraIntrinsic,
-    poses: List[np.ndarray],
+    poses: List[npt.NDArray[Any]],
     icp_distance: float,
     icp_voxel: float,
     icp_iterations: int,
-) -> List[np.ndarray]:
-    refined: List[np.ndarray] = [poses[0]]
+) -> List[npt.NDArray[Any]]:
+    refined: List[npt.NDArray[Any]] = [poses[0]]
     pcd_prev = _rgbd_to_pcd(rgbd_images[0], intrinsic, icp_voxel)
     criteria = o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=icp_iterations)
     for idx in range(1, len(rgbd_images)):
@@ -131,7 +132,7 @@ def _refine_poses_icp(
     return refined
 
 
-def _rotation_to_quaternion(rotation: np.ndarray) -> np.ndarray:
+def _rotation_to_quaternion(rotation: npt.NDArray[Any]) -> npt.NDArray[Any]:
     trace = float(np.trace(rotation))
     if trace > 0.0:
         s = np.sqrt(trace + 1.0) * 2.0
@@ -182,7 +183,7 @@ def _rotation_to_quaternion(rotation: np.ndarray) -> np.ndarray:
     return quat
 
 
-def _quaternion_to_rotation(quat: np.ndarray) -> np.ndarray:
+def _quaternion_to_rotation(quat: npt.NDArray[Any]) -> npt.NDArray[Any]:
     w, x, y, z = quat / np.linalg.norm(quat)
     return np.array(
         [
@@ -193,7 +194,7 @@ def _quaternion_to_rotation(quat: np.ndarray) -> np.ndarray:
     )
 
 
-def _rotation_power(rotation: np.ndarray, alpha: float) -> np.ndarray:
+def _rotation_power(rotation: npt.NDArray[Any], alpha: float) -> npt.NDArray[Any]:
     quat = _rotation_to_quaternion(rotation)
     angle = 2.0 * np.arccos(np.clip(quat[0], -1.0, 1.0))
     sin_half = np.linalg.norm(quat[1:])
@@ -206,25 +207,25 @@ def _rotation_power(rotation: np.ndarray, alpha: float) -> np.ndarray:
     return _quaternion_to_rotation(scaled_quat)
 
 
-def _interpolate_rigid_transform(transform: np.ndarray, alpha: float) -> np.ndarray:
+def _interpolate_rigid_transform(transform: npt.NDArray[Any], alpha: float) -> npt.NDArray[Any]:
     correction = np.eye(4)
     correction[:3, :3] = _rotation_power(transform[:3, :3], alpha)
     correction[:3, 3] = transform[:3, 3] * alpha
     return correction
 
 
-def _loop_closure_residual(last_pose: np.ndarray, last_to_first: np.ndarray) -> np.ndarray:
-    return cast(np.ndarray, last_pose @ last_to_first)
+def _loop_closure_residual(last_pose: npt.NDArray[Any], last_to_first: npt.NDArray[Any]) -> npt.NDArray[Any]:
+    return cast(npt.NDArray[Any], last_pose @ last_to_first)
 
 
 def _apply_loop_closure(
-    poses: List[np.ndarray],
+    poses: List[npt.NDArray[Any]],
     rgbd_images: List[o3d.geometry.RGBDImage],
     intrinsic: o3d.camera.PinholeCameraIntrinsic,
     icp_distance: float,
     icp_voxel: float,
     icp_iterations: int,
-) -> List[np.ndarray]:
+) -> List[npt.NDArray[Any]]:
     """Distribute loop closure error linearly across all poses.
 
     Aligns the last frame back to the first frame via ICP to measure accumulated
@@ -250,7 +251,7 @@ def _apply_loop_closure(
     loop_error = _loop_closure_residual(poses[-1], result.transformation)
     inv_error = np.linalg.inv(loop_error)
 
-    corrected: List[np.ndarray] = []
+    corrected: List[npt.NDArray[Any]] = []
     for i, pose in enumerate(poses):
         alpha = i / (n - 1)
         corrected.append(_interpolate_rigid_transform(inv_error, alpha) @ pose)
@@ -263,7 +264,7 @@ def _estimate_turntable_poses(
     icp_distance: float,
     icp_voxel: float,
     icp_iterations: int,
-) -> List[np.ndarray]:
+) -> List[npt.NDArray[Any]]:
     """Estimate poses for a turntable dataset using rotation-prior ICP.
 
     Each frame is registered against frame 0 using a Y-axis rotation initial
@@ -271,7 +272,7 @@ def _estimate_turntable_poses(
     odometry and handles the known-axis rotation of a turntable.
     """
     n = len(rgbd_images)
-    poses: List[np.ndarray] = [np.eye(4)]
+    poses: List[npt.NDArray[Any]] = [np.eye(4)]
     pcd_ref = _rgbd_to_pcd(rgbd_images[0], intrinsic, icp_voxel)
     criteria = o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=icp_iterations)
     for i in range(1, n):

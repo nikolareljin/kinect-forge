@@ -5,6 +5,8 @@ import webbrowser
 from pathlib import Path
 
 import numpy as np
+from typing import Any
+import numpy.typing as npt
 import open3d as o3d
 import plotly.graph_objects as go
 
@@ -23,8 +25,8 @@ def _open_figure(fig: go.Figure, title: str) -> Path:
 
 
 def _sample_points(
-    points: np.ndarray, colors: np.ndarray | None = None, max_points: int = 30000
-) -> tuple[np.ndarray, np.ndarray | None]:
+    points: npt.NDArray[Any], colors: npt.NDArray[Any] | None = None, max_points: int = 30000
+) -> tuple[npt.NDArray[Any], npt.NDArray[Any] | None]:
     if len(points) <= max_points:
         return points, colors
     step = max(1, len(points) // max_points)

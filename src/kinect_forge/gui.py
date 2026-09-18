@@ -5,12 +5,13 @@ import sys
 import threading
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable, Optional, TypeVar, cast
+from typing import Any, Callable, Optional, TypeVar, cast
 
 import tkinter as tk
 from tkinter import filedialog, ttk
 
 import numpy as np
+import numpy.typing as npt
 
 from kinect_forge.calibration import calibrate_intrinsics, save_intrinsics
 from kinect_forge.capture import capture_frames
@@ -412,7 +413,7 @@ class App:
         freenect_label.pack(anchor=tk.W, padx=8, pady=2)
 
         try:
-            import freenect  # type: ignore
+            import freenect
 
             _ = freenect  # silence unused
             freenect_label.config(text="Freenect: import OK")
@@ -543,7 +544,7 @@ class App:
                 payload = json.loads(Path(self.capture_intrinsics.get()).read_text())
                 intrinsics = KinectIntrinsics.from_dict(payload)
 
-            def preview_cb(color: np.ndarray, depth: np.ndarray) -> None:
+            def preview_cb(color: npt.NDArray[Any], depth: npt.NDArray[Any]) -> None:
                 if not self.capture_preview.get():
                     return
                 ppm = self._to_ppm_bytes(color)
@@ -657,7 +658,7 @@ class App:
         self.capture_preview_label.pack(anchor=tk.W, pady=4)
 
     @staticmethod
-    def _to_ppm_bytes(color: np.ndarray, max_width: int = 480) -> bytes:
+    def _to_ppm_bytes(color: npt.NDArray[Any], max_width: int = 480) -> bytes:
         if color.ndim != 3 or color.shape[2] != 3:
             return b""
         height, width, _ = color.shape
@@ -679,7 +680,7 @@ class App:
         self.capture_preview_label.configure(image=image)
 
     @staticmethod
-    def _depth_to_preview_rgb(depth: np.ndarray) -> np.ndarray:
+    def _depth_to_preview_rgb(depth: npt.NDArray[Any]) -> npt.NDArray[Any]:
         if depth.ndim != 2:
             raise ValueError("depth preview expects 2D depth array")
         depth_f = depth.astype(np.float32)
@@ -694,7 +695,7 @@ class App:
         depth_u8 = (scaled * 255.0).astype(np.uint8)
         return np.stack([depth_u8, depth_u8, depth_u8], axis=2)
 
-    def _compose_live_preview(self, color: np.ndarray, depth: np.ndarray) -> bytes:
+    def _compose_live_preview(self, color: npt.NDArray[Any], depth: npt.NDArray[Any]) -> bytes:
         depth_rgb = self._depth_to_preview_rgb(depth)
         combined = np.concatenate([color, depth_rgb], axis=1)
         return self._to_ppm_bytes(combined, max_width=960)

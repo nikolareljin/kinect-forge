@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 import cv2
 import numpy as np
+import numpy.typing as npt
 
 from kinect_forge.config import KinectIntrinsics
 
@@ -15,13 +16,13 @@ def _collect_calibration_points(
     image_paths: List[Path],
     pattern_size: Tuple[int, int],
     square_size: float,
-) -> Tuple[List[np.ndarray], List[np.ndarray], Tuple[int, int]]:
+) -> Tuple[List[npt.NDArray[Any]], List[npt.NDArray[Any]], Tuple[int, int]]:
     objp = np.zeros((pattern_size[0] * pattern_size[1], 3), np.float32)
     objp[:, :2] = np.mgrid[0 : pattern_size[0], 0 : pattern_size[1]].T.reshape(-1, 2)
     objp *= square_size
 
-    objpoints: List[np.ndarray] = []
-    imgpoints: List[np.ndarray] = []
+    objpoints: List[npt.NDArray[Any]] = []
+    imgpoints: List[npt.NDArray[Any]] = []
     image_size = None
 
     for path in image_paths:

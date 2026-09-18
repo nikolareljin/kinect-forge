@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
-import numpy as np
+import numpy.typing as npt
 
 
 @dataclass(frozen=True)
 class RGBDFrame:
-    color: np.ndarray
-    depth: np.ndarray
+    color: npt.NDArray[Any]
+    depth: npt.NDArray[Any]
 
 
 class Sensor(Protocol):

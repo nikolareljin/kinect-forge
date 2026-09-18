@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple, cast
+from typing import Any, Optional, Tuple, cast
 
 import open3d as o3d
 import numpy as np
+import numpy.typing as npt
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,7 @@ def measure_mesh(mesh_path: Path) -> MeshMeasurements:
     )
 
 
-def _bbox_extent(bbox: object) -> np.ndarray:
+def _bbox_extent(bbox: object) -> npt.NDArray[Any]:
     get_extent = getattr(bbox, "get_extent", None)
     if callable(get_extent):
         return np.asarray(get_extent())
@@ -43,5 +44,5 @@ def _bbox_extent(bbox: object) -> np.ndarray:
     max_bound = getattr(bbox, "get_max_bound", None)
     min_bound = getattr(bbox, "get_min_bound", None)
     if callable(max_bound) and callable(min_bound):
-        return cast(np.ndarray, np.asarray(max_bound()) - np.asarray(min_bound()))
+        return cast(npt.NDArray[Any], np.asarray(max_bound()) - np.asarray(min_bound()))
     raise AttributeError("Bounding box does not expose an extent method or attribute.")

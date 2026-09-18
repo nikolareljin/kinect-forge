@@ -1,6 +1,29 @@
 # Changelog
 
 ## Unreleased
+### Fixed
+- **CI lint has never passed on this repository, and now does.** `mypy --strict`
+  failed on 48 errors, so `Test`, `Build`, `Docker` and `Extra` were all skipped and
+  the tests in this branch had never run anywhere.
+  - `viewer.py` imports `plotly.graph_objects`, and **plotly was not declared** in
+    `pyproject.toml`. It was reaching the environment only through
+    `open3d -> dash -> plotly`, so the import worked by accident and would have
+    broken the day open3d dropped dash. It is a dependency now.
+  - `cv2`, `trimesh`, `imageio` and `plotly` ship no `py.typed` marker and have no
+    typeshed stubs, so strict mode rejects every import of them. `open3d` and
+    `freenect` were already listed in `[[tool.mypy.overrides]]`; these four were
+    missing.
+  - 42 annotations used a bare `np.ndarray`, which `disallow_any_generics` refuses.
+    They are `npt.NDArray[Any]` now — the same meaning, said explicitly.
+  - The `# type: ignore` on the `freenect` import in `gui.py` was stale once the
+    override existed, and strict mode reports an unused ignore as an error.
+
+### Changed
+- `scripts/script-helpers` advanced from 0.11.0 to **0.30.0**. Nothing in the library
+  was renamed or removed across that span, and the four functions this repo calls
+  (`parse_common_args`, `log_info`, `log_warn`, `log_error`) are unchanged.
+- The `.gitmodules` url gained its missing `.git` suffix, matching the fleet
+  convention.
 
 ## 0.2.0 - 2026-04-15
 ### Fixed

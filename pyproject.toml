@@ -21,6 +21,10 @@ dependencies = [
   "trimesh>=4.4",
   "typer>=0.12",
   "rich>=13.7",
+  # viewer.py imports plotly.graph_objects directly. It was reaching the
+  # environment only through open3d -> dash -> plotly, so the import worked by
+  # accident and would break the day open3d dropped dash.
+  "plotly>=5",
 ]
 
 [project.optional-dependencies]
@@ -49,4 +53,16 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["freenect"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# None of these ship a py.typed marker or have typeshed stubs, so strict mode
+# rejects every import of them. open3d and freenect were already listed; the
+# rest are imported by the same modules and were missing.
+module = [
+  "plotly", "plotly.*",
+  "cv2",
+  "trimesh", "trimesh.*",
+  "imageio", "imageio.*",
+]
 ignore_missing_imports = true
