@@ -51,12 +51,9 @@ if [[ -z "$PYTHON_BIN" ]]; then
   exit 1
 fi
 
-sudo apt update
-sudo apt install -y libfreenect-dev python3-tk \
-  build-essential pkg-config cmake
-if ! sudo apt install -y python3-freenect; then
-  echo "INFO: python3-freenect package not available via apt. Will use pip package fallback." >&2
-fi
+# Step 1: system packages. One list, in scripts/deps.sh, so this and
+# install.sh cannot drift apart or forget Open3D's EGL/GL libraries.
+"$ROOT_DIR/scripts/deps.sh"
 
 VENV_DIR="${VENV_DIR:-$ROOT_DIR/.venv}"
 if [ ! -d "$VENV_DIR" ]; then

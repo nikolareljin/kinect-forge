@@ -15,6 +15,15 @@
   PyInstaller's generated `.spec` is ignored.
 
 ### Changed
+- **Installing is two steps, and the dependency list has one home.**
+  `./deps` installs the system packages; `./install` (or `./setup` for a
+  development checkout) installs the application. The list previously lived in
+  three places that disagreed — `setup.sh`, `install.sh` and a CI-only script —
+  and **none of them installed the libraries Open3D links at import time**, so
+  `import open3d` raised `ImportError: libEGL.so.1` on any machine without a
+  desktop stack already present. CI now runs the same `./deps` a user runs, so
+  the two cannot drift. `scripts/package.ps1` became `scripts/bundle.ps1`,
+  matching its Unix sibling.
 - **A release ships the wheel and sdist, not a frozen bundle.** The single
   archive was still 501 MB, and it cannot be made small: `libOpen3D.so` alone is
   768 MB, and dropping everything this project does not use — the TensorFlow ops
