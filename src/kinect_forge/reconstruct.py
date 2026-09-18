@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import warnings
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Tuple, cast
+from typing import Any, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -31,10 +32,10 @@ def _rgbd_from_paths(
 
 
 def _estimate_poses(
-    rgbd_images: List[o3d.geometry.RGBDImage],
+    rgbd_images: list[o3d.geometry.RGBDImage],
     intrinsic: o3d.camera.PinholeCameraIntrinsic,
-) -> List[npt.NDArray[Any]]:
-    poses: List[npt.NDArray[Any]] = [np.eye(4)]
+) -> list[npt.NDArray[Any]]:
+    poses: list[npt.NDArray[Any]] = [np.eye(4)]
     odom_jacobian = o3d.pipelines.odometry.RGBDOdometryJacobianFromHybridTerm()
     for idx in range(1, len(rgbd_images)):
         success, trans, _ = o3d.pipelines.odometry.compute_rgbd_odometry(
@@ -51,14 +52,14 @@ def _estimate_poses(
 
 
 def _select_keyframes(
-    pairs: List[Tuple[Path, Path]],
+    pairs: list[tuple[Path, Path]],
     depth_scale: float,
     threshold: float,
-) -> List[Tuple[Path, Path]]:
+) -> list[tuple[Path, Path]]:
     if threshold <= 0:
         return pairs
 
-    selected: List[Tuple[Path, Path]] = []
+    selected: list[tuple[Path, Path]] = []
     last_depth: npt.NDArray[Any] | None = None
     for color_path, depth_path in pairs:
         depth = o3d.io.read_image(str(depth_path))
@@ -74,11 +75,11 @@ def _select_keyframes(
     return selected
 
 
-def _assert_depth_frames(pairs: List[Tuple[Path, Path]], depth_scale: float) -> None:
+def _assert_depth_frames(pairs: list[tuple[Path, Path]], depth_scale: float) -> None:
     sample = pairs[: min(5, len(pairs))]
     if not sample:
         return
-    ratios: List[float] = []
+    ratios: list[float] = []
     for _, depth_path in sample:
         depth = o3d.io.read_image(str(depth_path))
         depth_arr = np.asarray(depth).astype(np.float32) / depth_scale
@@ -105,14 +106,14 @@ def _rgbd_to_pcd(
 
 
 def _refine_poses_icp(
-    rgbd_images: List[o3d.geometry.RGBDImage],
+    rgbd_images: list[o3d.geometry.RGBDImage],
     intrinsic: o3d.camera.PinholeCameraIntrinsic,
-    poses: List[npt.NDArray[Any]],
+    poses: list[npt.NDArray[Any]],
     icp_distance: float,
     icp_voxel: float,
     icp_iterations: int,
-) -> List[npt.NDArray[Any]]:
-    refined: List[npt.NDArray[Any]] = [poses[0]]
+) -> list[npt.NDArray[Any]]:
+    refined: list[npt.NDArray[Any]] = [poses[0]]
     pcd_prev = _rgbd_to_pcd(rgbd_images[0], intrinsic, icp_voxel)
     criteria = o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=icp_iterations)
     for idx in range(1, len(rgbd_images)):
@@ -219,13 +220,13 @@ def _loop_closure_residual(last_pose: npt.NDArray[Any], last_to_first: npt.NDArr
 
 
 def _apply_loop_closure(
-    poses: List[npt.NDArray[Any]],
-    rgbd_images: List[o3d.geometry.RGBDImage],
+    poses: list[npt.NDArray[Any]],
+    rgbd_images: list[o3d.geometry.RGBDImage],
     intrinsic: o3d.camera.PinholeCameraIntrinsic,
     icp_distance: float,
     icp_voxel: float,
     icp_iterations: int,
-) -> List[npt.NDArray[Any]]:
+) -> list[npt.NDArray[Any]]:
     """Distribute loop closure error linearly across all poses.
 
     Aligns the last frame back to the first frame via ICP to measure accumulated
@@ -251,7 +252,7 @@ def _apply_loop_closure(
     loop_error = _loop_closure_residual(poses[-1], result.transformation)
     inv_error = np.linalg.inv(loop_error)
 
-    corrected: List[npt.NDArray[Any]] = []
+    corrected: list[npt.NDArray[Any]] = []
     for i, pose in enumerate(poses):
         alpha = i / (n - 1)
         corrected.append(_interpolate_rigid_transform(inv_error, alpha) @ pose)
@@ -259,12 +260,12 @@ def _apply_loop_closure(
 
 
 def _estimate_turntable_poses(
-    rgbd_images: List[o3d.geometry.RGBDImage],
+    rgbd_images: list[o3d.geometry.RGBDImage],
     intrinsic: o3d.camera.PinholeCameraIntrinsic,
     icp_distance: float,
     icp_voxel: float,
     icp_iterations: int,
-) -> List[npt.NDArray[Any]]:
+) -> list[npt.NDArray[Any]]:
     """Estimate poses for a turntable dataset using rotation-prior ICP.
 
     Each frame is registered against frame 0 using a Y-axis rotation initial
@@ -272,7 +273,7 @@ def _estimate_turntable_poses(
     odometry and handles the known-axis rotation of a turntable.
     """
     n = len(rgbd_images)
-    poses: List[npt.NDArray[Any]] = [np.eye(4)]
+    poses: list[npt.NDArray[Any]] = [np.eye(4)]
     pcd_ref = _rgbd_to_pcd(rgbd_images[0], intrinsic, icp_voxel)
     criteria = o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=icp_iterations)
     for i in range(1, n):
@@ -319,7 +320,7 @@ def reconstruct_mesh(
     input_dir: Path,
     output_mesh: Path,
     config: ReconstructionConfig,
-    progress_callback: Optional[Callable[[int, int], None]] = None,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> None:
     meta = load_metadata(input_dir)
     pairs = list_frame_pairs(input_dir)
@@ -390,7 +391,7 @@ def reconstruct_mesh(
     )
 
     total_frames = len(rgbd_images)
-    for idx, (rgbd, pose) in enumerate(zip(rgbd_images, poses)):
+    for idx, (rgbd, pose) in enumerate(zip(rgbd_images, poses, strict=True)):
         volume.integrate(rgbd, intrinsic, np.linalg.inv(pose))
         if progress_callback is not None:
             progress_callback(idx + 1, total_frames)

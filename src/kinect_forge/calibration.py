@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import Any
 
 import cv2
 import numpy as np
@@ -13,16 +13,16 @@ from kinect_forge.config import KinectIntrinsics
 
 
 def _collect_calibration_points(
-    image_paths: List[Path],
-    pattern_size: Tuple[int, int],
+    image_paths: list[Path],
+    pattern_size: tuple[int, int],
     square_size: float,
-) -> Tuple[List[npt.NDArray[Any]], List[npt.NDArray[Any]], Tuple[int, int]]:
+) -> tuple[list[npt.NDArray[Any]], list[npt.NDArray[Any]], tuple[int, int]]:
     objp = np.zeros((pattern_size[0] * pattern_size[1], 3), np.float32)
     objp[:, :2] = np.mgrid[0 : pattern_size[0], 0 : pattern_size[1]].T.reshape(-1, 2)
     objp *= square_size
 
-    objpoints: List[npt.NDArray[Any]] = []
-    imgpoints: List[npt.NDArray[Any]] = []
+    objpoints: list[npt.NDArray[Any]] = []
+    imgpoints: list[npt.NDArray[Any]] = []
     image_size = None
 
     for path in image_paths:
@@ -46,8 +46,8 @@ def _collect_calibration_points(
 
 
 def calibrate_intrinsics(
-    image_paths: List[Path],
-    pattern_size: Tuple[int, int],
+    image_paths: list[Path],
+    pattern_size: tuple[int, int],
     square_size: float,
 ) -> KinectIntrinsics:
     objpoints, imgpoints, image_size = _collect_calibration_points(

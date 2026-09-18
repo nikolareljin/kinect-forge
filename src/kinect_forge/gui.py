@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 import sys
 import threading
+import tkinter as tk
+from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Callable, Optional, TypeVar, cast
-
-import tkinter as tk
 from tkinter import filedialog, ttk
+from typing import Any, TypeVar, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -28,10 +28,10 @@ class App:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("Kinect Forge")
-        self._preview_image: Optional[tk.PhotoImage] = None
-        self._live_preview_image: Optional[tk.PhotoImage] = None
-        self._live_preview_window: Optional[tk.Toplevel] = None
-        self._live_preview_label: Optional[ttk.Label] = None
+        self._preview_image: tk.PhotoImage | None = None
+        self._live_preview_image: tk.PhotoImage | None = None
+        self._live_preview_window: tk.Toplevel | None = None
+        self._live_preview_label: ttk.Label | None = None
         self._live_preview_running = False
         self._build_ui()
 
@@ -46,7 +46,7 @@ class App:
         self._recon_progress_text = tk.StringVar(value="")
         self._pipeline_step1_status = tk.StringVar(value="pending")
         self._pipeline_step2_status = tk.StringVar(value="pending")
-        self._thumbnail_image: Optional[tk.PhotoImage] = None
+        self._thumbnail_image: tk.PhotoImage | None = None
 
         # Shared vars initialized here so both Pipeline and Capture/Reconstruct tabs
         # can reference them regardless of tab build order.
@@ -163,10 +163,26 @@ class App:
         threading.Thread(target=runner, daemon=True).start()
 
     def _refresh_calib_status(self) -> None:
+        """Report what capture will actually use, not merely what exists.
+
+        This used to test `calibration.json.is_file()`. A file that is present
+        but unreadable or malformed made the status say "loaded" while
+        `capture._find_default_calibration()` quietly fell back to the Kinect v1
+        defaults -- the interface claiming one thing and the capture doing
+        another, with nothing to reconcile them. Asking the same helper capture
+        asks means the two cannot disagree.
+        """
         from pathlib import Path as _Path
 
-        if (_Path.cwd() / "calibration.json").is_file():
+        from kinect_forge.capture import _find_default_calibration
+
+        candidate = _Path.cwd() / "calibration.json"
+        if _find_default_calibration() is not None:
             self._calib_status.set("Calibration: loaded from calibration.json")
+        elif candidate.is_file():
+            self._calib_status.set(
+                "Calibration: calibration.json is unreadable; using Kinect v1 defaults"
+            )
         else:
             self._calib_status.set("Calibration: using Kinect v1 defaults")
 
@@ -174,7 +190,7 @@ class App:
         self._recon_progress_bar["value"] = pct
         self._recon_progress_text.set(f"Frame {current} / {total}")
 
-    def _render_mesh_thumbnail(self, mesh_path: Path) -> Optional[bytes]:
+    def _render_mesh_thumbnail(self, mesh_path: Path) -> bytes | None:
         """Render a 400x300 PNG thumbnail of the mesh using Open3D offscreen rendering.
 
         Returns raw PNG bytes, or None if rendering is unavailable.
@@ -193,7 +209,7 @@ class App:
             bounds = mesh.get_axis_aligned_bounding_box()
             renderer.setup_camera(60.0, bounds, bounds.get_center())
             img = renderer.render_to_image()
-            return cast(Optional[bytes], o3d.io.write_image_to_memory(img, ".png"))
+            return cast(bytes | None, o3d.io.write_image_to_memory(img, ".png"))
         except Exception:
             return None
 

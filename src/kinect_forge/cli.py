@@ -2,27 +2,25 @@ from __future__ import annotations
 
 import json
 import pathlib
-from typing import List, Optional, Tuple
 
 import typer
 from rich.console import Console
 
 from kinect_forge.calibration import calibrate_intrinsics, save_intrinsics
 from kinect_forge.capture import capture_frames
-from kinect_forge.config import CaptureConfig, ReconstructionConfig
-from kinect_forge.config import KinectIntrinsics
+from kinect_forge.config import CaptureConfig, KinectIntrinsics, ReconstructionConfig
 from kinect_forge.measure import measure_mesh
 from kinect_forge.presets import capture_preset, reconstruction_preset
 from kinect_forge.reconstruct import reconstruct_mesh
 from kinect_forge.sensors.freenect_v1 import FreenectV1Sensor, probe_device, set_tilt_degs
-from kinect_forge.viewer import view_dataset, view_mesh
 from kinect_forge.turntable import get_turntable_preset
+from kinect_forge.viewer import view_dataset, view_mesh
 
 app = typer.Typer(add_completion=False)
 console = Console()
 
 
-def _parse_tuple(value: Optional[str], length: int, label: str) -> Optional[Tuple[int, ...]]:
+def _parse_tuple(value: str | None, length: int, label: str) -> tuple[int, ...] | None:
     if value is None or value == "":
         return None
     parts = [p.strip() for p in value.split(",")]
@@ -77,20 +75,20 @@ def capture(
     auto_stop: bool = typer.Option(False, help="Auto-stop turntable capture"),
     auto_stop_patience: int = typer.Option(30, help="Auto-stop patience frames"),
     auto_stop_delta: float = typer.Option(0.002, help="Auto-stop delta threshold (m)"),
-    roi: Optional[str] = typer.Option(None, help="ROI as x,y,w,h (pixels). Empty disables ROI."),
+    roi: str | None = typer.Option(None, help="ROI as x,y,w,h (pixels). Empty disables ROI."),
     color_mask: bool = typer.Option(False, help="Enable HSV color masking"),
-    hsv_lower: Optional[str] = typer.Option(None, help="HSV lower bound h,s,v"),
-    hsv_upper: Optional[str] = typer.Option(None, help="HSV upper bound h,s,v"),
-    turntable_preset: Optional[str] = typer.Option(None, help="Turntable preset: vxb-8"),
-    turntable_model: Optional[str] = typer.Option(None, help="Turntable model name"),
-    turntable_diameter_mm: Optional[int] = typer.Option(None, help="Turntable diameter in mm"),
-    turntable_rotation_seconds: Optional[float] = typer.Option(
+    hsv_lower: str | None = typer.Option(None, help="HSV lower bound h,s,v"),
+    hsv_upper: str | None = typer.Option(None, help="HSV upper bound h,s,v"),
+    turntable_preset: str | None = typer.Option(None, help="Turntable preset: vxb-8"),
+    turntable_model: str | None = typer.Option(None, help="Turntable model name"),
+    turntable_diameter_mm: int | None = typer.Option(None, help="Turntable diameter in mm"),
+    turntable_rotation_seconds: float | None = typer.Option(
         None, help="Turntable rotation period in seconds"
     ),
-    intrinsics_path: Optional[pathlib.Path] = typer.Option(
+    intrinsics_path: pathlib.Path | None = typer.Option(
         None, help="Optional intrinsics JSON from calibrate"
     ),
-    capture_preset_name: Optional[str] = typer.Option(
+    capture_preset_name: str | None = typer.Option(
         None, "--capture-preset", help="Capture preset: small-object|face-scan"
     ),
     tilt_sweep: bool = typer.Option(False, help="Enable tilt sweep during capture"),
@@ -194,21 +192,21 @@ def reconstruct(
         "small",
         help="Reconstruction preset: small|medium|large|small-object|face-scan",
     ),
-    voxel_length: Optional[float] = typer.Option(None, help="TSDF voxel size in meters"),
-    sdf_trunc: Optional[float] = typer.Option(None, help="TSDF truncation distance in meters"),
-    depth_scale: Optional[float] = typer.Option(None, help="Depth scale (mm -> meters)"),
-    depth_trunc: Optional[float] = typer.Option(None, help="Max depth in meters"),
-    keyframe_threshold: Optional[float] = typer.Option(
+    voxel_length: float | None = typer.Option(None, help="TSDF voxel size in meters"),
+    sdf_trunc: float | None = typer.Option(None, help="TSDF truncation distance in meters"),
+    depth_scale: float | None = typer.Option(None, help="Depth scale (mm -> meters)"),
+    depth_trunc: float | None = typer.Option(None, help="Max depth in meters"),
+    keyframe_threshold: float | None = typer.Option(
         None, help="Depth change threshold for keyframe selection (meters)"
     ),
-    icp: Optional[bool] = typer.Option(
+    icp: bool | None = typer.Option(
         None, "--icp/--no-icp", help="Enable/disable ICP refinement"
     ),
-    icp_distance: Optional[float] = typer.Option(None, help="ICP max correspondence distance"),
-    icp_voxel: Optional[float] = typer.Option(None, help="ICP voxel downsample size"),
-    icp_iterations: Optional[int] = typer.Option(None, help="ICP max iterations"),
-    smooth: Optional[int] = typer.Option(None, help="Mesh smoothing iterations"),
-    fill_hole_radius: Optional[float] = typer.Option(None, help="Fill holes radius (meters)"),
+    icp_distance: float | None = typer.Option(None, help="ICP max correspondence distance"),
+    icp_voxel: float | None = typer.Option(None, help="ICP voxel downsample size"),
+    icp_iterations: int | None = typer.Option(None, help="ICP max iterations"),
+    smooth: int | None = typer.Option(None, help="Mesh smoothing iterations"),
+    fill_hole_radius: float | None = typer.Option(None, help="Fill holes radius (meters)"),
 ) -> None:
     """Reconstruct a mesh from captured frames."""
     config = reconstruction_preset(preset)
@@ -257,7 +255,7 @@ def measure(
 
 @app.command()
 def calibrate(
-    images: List[pathlib.Path] = typer.Option(
+    images: list[pathlib.Path] = typer.Option(
         ..., help="Calibration images (space-separated list)"
     ),
     rows: int = typer.Option(7, help="Chessboard inner corners rows"),
@@ -273,8 +271,8 @@ def calibrate(
 
 @app.command()
 def view(
-    mesh: Optional[pathlib.Path] = typer.Option(None, help="Mesh to view"),
-    dataset: Optional[pathlib.Path] = typer.Option(None, help="Dataset to preview"),
+    mesh: pathlib.Path | None = typer.Option(None, help="Mesh to view"),
+    dataset: pathlib.Path | None = typer.Option(None, help="Dataset to preview"),
     every: int = typer.Option(10, help="Use every Nth frame for dataset preview"),
 ) -> None:
     """Preview a mesh or a dataset point cloud."""

@@ -17,8 +17,29 @@
     They are `npt.NDArray[Any]` now — the same meaning, said explicitly.
   - The `# type: ignore` on the `freenect` import in `gui.py` was stale once the
     override existed, and strict mode reports an unused ignore as an error.
+- **The calibration status said "loaded" for a file it could not read.**
+  `_refresh_calib_status` tested only that `calibration.json` existed, while
+  `capture._find_default_calibration()` quietly fell back to the Kinect v1
+  defaults when the file was malformed — the interface claiming one thing and the
+  capture doing another. It asks the same helper capture asks now, so the two
+  cannot disagree, and says so explicitly when the file is present but unreadable.
 
 ### Changed
+- **The lint is pinned to a rule set instead of inheriting one.** `[tool.ruff]`
+  set only `line-length`, so it took whatever ruff's defaults were, and
+  `pyproject.toml` asks for `ruff>=0.6` — pip installs the newest. ruff 0.16
+  widened its defaults and **147 errors appeared in CI without a line of this
+  code changing**. `select` is now explicit and wider than the pre-0.16 default:
+  import sorting, pyupgrade, bugbear and comprehension checks. `B008` is ignored
+  because every hit is `typer.Option` in an argument default, which is typer's
+  documented idiom. 127 findings were auto-fixed; six needed judgement —
+  a chained exception in `presets.py`, `strict=True` on a `zip` whose inputs must
+  correspond, and four `dict()` calls rewritten as literals.
+- **mypy analyses as 3.12, not the 3.10 in `requires-python`.** numpy 2.3+ writes
+  its stubs with PEP 695 `type` statements, which mypy refuses to read when
+  targeting anything older — it stops inside `numpy/__init__.pyi` before checking
+  a line of this project. CI runs 3.12, so this matches what executes. The cost is
+  recorded in `pyproject.toml`: the `>=3.10` claim is no longer type-verified.
 - `scripts/script-helpers` advanced from 0.11.0 to **0.30.0**. Nothing in the library
   was renamed or removed across that span, and the four functions this repo calls
   (`parse_common_args`, `log_info`, `log_warn`, `log_error`) are unchanged.

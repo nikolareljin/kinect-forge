@@ -3,9 +3,9 @@ from __future__ import annotations
 import tempfile
 import webbrowser
 from pathlib import Path
+from typing import Any
 
 import numpy as np
-from typing import Any
 import numpy.typing as npt
 import open3d as o3d
 import plotly.graph_objects as go
@@ -61,8 +61,8 @@ def view_mesh(mesh_path: Path) -> Path:
         ]
     )
     fig.update_layout(
-        scene=dict(aspectmode="data"),
-        margin=dict(l=0, r=0, b=0, t=40),
+        scene={"aspectmode": "data"},
+        margin={"l": 0, "r": 0, "b": 0, "t": 40},
     )
     return _open_figure(fig, f"Kinect Forge Mesh: {mesh_path.name}")
 
@@ -132,7 +132,7 @@ def view_dataset(input_dir: Path, every: int = 10) -> Path:
         ]
     )
     fig.update_layout(
-        scene=dict(aspectmode="data"),
-        margin=dict(l=0, r=0, b=0, t=40),
+        scene={"aspectmode": "data"},
+        margin={"l": 0, "r": 0, "b": 0, "t": 40},
     )
     return _open_figure(fig, f"Kinect Forge Dataset: {input_dir.name}")

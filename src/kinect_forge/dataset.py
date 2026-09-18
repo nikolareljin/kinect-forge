@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from kinect_forge.config import KinectIntrinsics
 
@@ -17,11 +17,11 @@ class DatasetMeta:
     color_format: str = "rgb"
     depth_unit: str = "mm"
     depth_format: str = "mm"
-    turntable_model: Optional[str] = None
-    turntable_diameter_mm: Optional[int] = None
-    turntable_rotation_seconds: Optional[float] = None
+    turntable_model: str | None = None
+    turntable_diameter_mm: int | None = None
+    turntable_rotation_seconds: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "intrinsics": self.intrinsics.to_dict(),
             "depth_scale": self.depth_scale,
@@ -36,7 +36,7 @@ class DatasetMeta:
         }
 
 
-def ensure_dirs(root: Path) -> Tuple[Path, Path]:
+def ensure_dirs(root: Path) -> tuple[Path, Path]:
     color_dir = root / "color"
     depth_dir = root / "depth"
     color_dir.mkdir(parents=True, exist_ok=True)
@@ -66,11 +66,11 @@ def load_metadata(root: Path) -> DatasetMeta:
     )
 
 
-def list_frame_pairs(root: Path) -> List[Tuple[Path, Path]]:
+def list_frame_pairs(root: Path) -> list[tuple[Path, Path]]:
     color_dir = root / "color"
     depth_dir = root / "depth"
     color_files = sorted(color_dir.glob("color_*.png"))
-    pairs: List[Tuple[Path, Path]] = []
+    pairs: list[tuple[Path, Path]] = []
     for color in color_files:
         idx = color.stem.split("_")[-1]
         depth = depth_dir / f"depth_{idx}.png"

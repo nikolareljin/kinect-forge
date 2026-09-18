@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict
 
 
 @dataclass(frozen=True)
@@ -12,7 +11,7 @@ class TurntablePreset:
     rotation_seconds: float
 
 
-_PRESETS: Dict[str, TurntablePreset] = {
+_PRESETS: dict[str, TurntablePreset] = {
     "vxb-8": TurntablePreset(
         name="vxb-8",
         model="VXB 8-inch electric turntable",

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 
@@ -14,7 +13,7 @@ class FreenectV1Config:
 
 
 class FreenectV1Sensor:
-    def __init__(self, config: Optional[FreenectV1Config] = None) -> None:
+    def __init__(self, config: FreenectV1Config | None = None) -> None:
         self._config = config or FreenectV1Config()
         try:
             import freenect

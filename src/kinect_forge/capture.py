@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 import cv2
 import imageio.v3 as iio
@@ -15,7 +16,7 @@ from kinect_forge.dataset import DatasetMeta, ensure_dirs, write_metadata
 from kinect_forge.sensors.base import Sensor
 
 
-def _find_default_calibration() -> Optional[KinectIntrinsics]:
+def _find_default_calibration() -> KinectIntrinsics | None:
     """Load calibration.json from cwd if present, return None otherwise."""
     candidate = Path.cwd() / "calibration.json"
     if candidate.is_file():
@@ -91,9 +92,9 @@ def capture_frames(
     sensor: Sensor,
     output_dir: Path,
     config: CaptureConfig,
-    intrinsics: Optional[KinectIntrinsics] = None,
-    preview_cb: Optional[Callable[[npt.NDArray[Any], npt.NDArray[Any]], None]] = None,
-    tilt_cb: Optional[Callable[[float], None]] = None,
+    intrinsics: KinectIntrinsics | None = None,
+    preview_cb: Callable[[npt.NDArray[Any], npt.NDArray[Any]], None] | None = None,
+    tilt_cb: Callable[[float], None] | None = None,
 ) -> None:
     if config.mode not in {"standard", "turntable"}:
         raise ValueError("mode must be 'standard' or 'turntable'")
@@ -133,7 +134,7 @@ def capture_frames(
         last_ts = time.monotonic()
         saved = 0
         total = 0
-        last_saved_depth: Optional[npt.NDArray[Any]] = None
+        last_saved_depth: npt.NDArray[Any] | None = None
         stagnant = 0
         tilt_angle = config.tilt_min
         tilt_dir = 1.0
