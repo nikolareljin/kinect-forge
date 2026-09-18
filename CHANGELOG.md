@@ -2,6 +2,18 @@
 
 ## Unreleased
 ### Fixed
+- **`scripts/package.sh` never installed PyInstaller.** It called
+  `python -m PyInstaller` in whatever environment it found, so the release build
+  failed with `No module named PyInstaller` the first time it ever ran. The
+  `packaging` extra declaring `pyinstaller>=6.7` already existed; nothing
+  installed it. The script now creates and populates a venv the same way
+  `lint.sh` and `test.sh` do.
+- **The release would have carried thousands of loose files.** `artifact_paths`
+  was `dist/**`, and PyInstaller's COLLECT build is a directory — 6424 files and
+  1.3 GB here, since `--collect-submodules open3d` bundles the whole library — so
+  every one of them would have been attached to the release individually.
+  `package.sh` now produces a single `kinect-forge-<version>-<os>-<arch>.tar.gz`
+  and the workflow publishes that. PyInstaller's generated `.spec` is ignored.
 - **The packaging workflow could never have started.** `release-build.yml`
   declares `contents: write`, this repository's default workflow token is `read`,
   and `package.yml` granted nothing — so GitHub refused the run before any step,
