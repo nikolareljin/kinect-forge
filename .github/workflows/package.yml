@@ -13,6 +13,15 @@ on:
       # 0.1.0 and 1.21.0, and not a date, a branch name or a bare number.
       - "[0-9]+.[0-9]+.[0-9]+"
 
+# release-build.yml declares `contents: write` on its job, and GitHub requires a
+# caller's granted permissions to be a superset of the callee's before it will
+# start the run. This repository's default workflow token is `read`, so without
+# this block the run ends in startup_failure with no step executed and no log to
+# read. That went unnoticed because the trigger used to be `v*` while the only
+# tag was `0.1.0` -- nothing had ever reached this workflow to fail.
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
