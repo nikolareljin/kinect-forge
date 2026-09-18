@@ -33,7 +33,13 @@ dev = [
   "ruff>=0.6",
   "mypy>=1.10",
 ]
+# What a release ships: the wheel and sdist built by scripts/package.sh.
 packaging = [
+  "build>=1.2",
+]
+# Only for scripts/bundle.sh, the local frozen application. Not used by CI, and
+# not what a release publishes -- see the note at the top of that script.
+bundle = [
   "pyinstaller>=6.7",
 ]
 

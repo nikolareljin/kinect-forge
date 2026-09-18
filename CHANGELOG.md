@@ -12,8 +12,19 @@
   was `dist/**`, and PyInstaller's COLLECT build is a directory — 6424 files and
   1.3 GB here, since `--collect-submodules open3d` bundles the whole library — so
   every one of them would have been attached to the release individually.
-  `package.sh` now produces a single `kinect-forge-<version>-<os>-<arch>.tar.gz`
-  and the workflow publishes that. PyInstaller's generated `.spec` is ignored.
+  PyInstaller's generated `.spec` is ignored.
+
+### Changed
+- **A release ships the wheel and sdist, not a frozen bundle.** The single
+  archive was still 501 MB, and it cannot be made small: `libOpen3D.so` alone is
+  768 MB, and dropping everything this project does not use — the TensorFlow ops
+  (45 MB), the PyTorch ops (35 MB), `dash` (35 MB), `jedi` (32 MB) — still leaves
+  over a gigabyte. `scripts/package.sh` now builds the distributables instead:
+  **two files, 76 KB total**, with `pip` resolving open3d from PyPI where it is
+  cached once per machine rather than copied into every release. The frozen build
+  moved to `scripts/bundle.sh` for local use and is not run by CI; the
+  `pyinstaller` dependency moved to a `bundle` extra, and `packaging` now carries
+  `build`.
 - **The packaging workflow could never have started.** `release-build.yml`
   declares `contents: write`, this repository's default workflow token is `read`,
   and `package.yml` granted nothing — so GitHub refused the run before any step,
