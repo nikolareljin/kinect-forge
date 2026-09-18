@@ -17,7 +17,7 @@ class MeshMeasurements:
 
 
 def measure_mesh(mesh_path: Path) -> MeshMeasurements:
-    mesh = o3d.io.read_triangle_mesh(str(mesh_path))
+    mesh = o3d.io.read_triangle_mesh(mesh_path)
     if mesh.is_empty():
         raise RuntimeError("Mesh is empty or could not be read.")
     aabb = mesh.get_axis_aligned_bounding_box()

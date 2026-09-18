@@ -2,6 +2,29 @@
 
 ## Unreleased
 ### Fixed
+- **Every reconstruction fused each surface twice.** `reconstruct.py` mixed two
+  opposite pose conventions. `_estimate_poses` accumulates RGBD odometry into
+  **world-to-camera** matrices, but `_refine_poses_icp`, `_estimate_turntable_poses`
+  and the TSDF integration call all treated them as **camera-to-world** — because
+  `registration_icp(source, target)` returns `T_target<-source`, which composes the
+  other way round. On a synthetic scene with only 0.15 rad of camera motion, the
+  integrated mesh came out with twice the vertices and a bounding box 0.22 m wider
+  than the object. The three mismatched sites now follow the producer, the
+  convention is written down at the top of the module, and two tests pin it by
+  driving the refinement with a known-perfect registration oracle.
+- **The mesh thumbnail could never have rendered.** `_render_mesh_thumbnail` called
+  `o3d.io.write_image_to_memory`, which does not exist in Open3D, and passed a
+  bounding box to `setup_camera` where a 3-vector centre belongs while omitting the
+  required `up` argument. A `try/except Exception: return None` around the whole
+  body turned both into a silently missing image. It now encodes through
+  `o3d.io.write_image`, frames the mesh from its bounding sphere, and only catches
+  the one call that legitimately depends on the machine — building an
+  `OffscreenRenderer` without a GPU — which it logs.
+### Changed
+- Thumbnail rendering moved from `gui.py` to `viewer.py`. It is pure Open3D with no
+  Tk dependency, so its tests no longer need to skip when tkinter is absent, and
+  `tests/test_reconstruct.py` no longer skips itself when Open3D fails to import —
+  Open3D is a declared dependency and a failure to import it is a real failure.
 - **CI lint has never passed on this repository, and now does.** `mypy --strict`
   failed on 48 errors, so `Test`, `Build`, `Docker` and `Extra` were all skipped and
   the tests in this branch had never run anywhere.

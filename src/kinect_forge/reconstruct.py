@@ -1,3 +1,24 @@
+"""Fuse a captured RGBD sequence into a triangle mesh.
+
+Pose convention
+---------------
+Every 4x4 matrix in a ``poses`` list is **world-to-camera** (``T_ci<-c0``): the
+extrinsic matrix that maps a point in world coordinates into frame ``i``'s camera
+coordinates. Frame 0 defines the world, so ``poses[0]`` is the identity.
+
+This matters because Open3D's two registration APIs compose in opposite
+directions:
+
+* ``compute_rgbd_odometry(source, target)`` returns ``T_target<-source``, so
+  accumulating it as ``trans @ poses[-1]`` yields world-to-camera directly.
+* ``registration_icp(source, target)`` also returns ``T_target<-source``, but ICP
+  here registers a later frame *onto an earlier one*, so its result is
+  camera-to-world and must be inverted before it joins a ``poses`` list.
+
+``ScalableTSDFVolume.integrate`` wants the extrinsic, so a pose is passed to it
+unchanged. Mixing the two conventions reconstructs every surface twice.
+"""
+
 from __future__ import annotations
 
 import warnings
@@ -20,8 +41,8 @@ def _rgbd_from_paths(
     depth_scale: float,
     depth_trunc: float,
 ) -> o3d.geometry.RGBDImage:
-    color = o3d.io.read_image(str(color_path))
-    depth = o3d.io.read_image(str(depth_path))
+    color = o3d.io.read_image(color_path)
+    depth = o3d.io.read_image(depth_path)
     return o3d.geometry.RGBDImage.create_from_color_and_depth(
         color,
         depth,
@@ -62,7 +83,7 @@ def _select_keyframes(
     selected: list[tuple[Path, Path]] = []
     last_depth: npt.NDArray[Any] | None = None
     for color_path, depth_path in pairs:
-        depth = o3d.io.read_image(str(depth_path))
+        depth = o3d.io.read_image(depth_path)
         depth_arr = np.asarray(depth).astype(np.float32) / depth_scale
         if last_depth is None:
             selected.append((color_path, depth_path))
@@ -81,7 +102,7 @@ def _assert_depth_frames(pairs: list[tuple[Path, Path]], depth_scale: float) -> 
         return
     ratios: list[float] = []
     for _, depth_path in sample:
-        depth = o3d.io.read_image(str(depth_path))
+        depth = o3d.io.read_image(depth_path)
         depth_arr = np.asarray(depth).astype(np.float32) / depth_scale
         if depth_arr.size == 0:
             continue
@@ -118,7 +139,9 @@ def _refine_poses_icp(
     criteria = o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=icp_iterations)
     for idx in range(1, len(rgbd_images)):
         pcd = _rgbd_to_pcd(rgbd_images[idx], intrinsic, icp_voxel)
-        initial = np.linalg.inv(poses[idx - 1]) @ poses[idx]
+        # registration_icp(source, target) returns T_target<-source, so both the
+        # initial guess and the result are T_prev<-current.
+        initial = poses[idx - 1] @ np.linalg.inv(poses[idx])
         result = o3d.pipelines.registration.registration_icp(
             pcd,
             pcd_prev,
@@ -127,7 +150,7 @@ def _refine_poses_icp(
             o3d.pipelines.registration.TransformationEstimationPointToPlane(),
             criteria,
         )
-        refined_pose = refined[-1] @ result.transformation
+        refined_pose = np.linalg.inv(result.transformation) @ refined[-1]
         refined.append(refined_pose)
         pcd_prev = pcd
     return refined
@@ -296,7 +319,8 @@ def _estimate_turntable_poses(
             o3d.pipelines.registration.TransformationEstimationPointToPlane(),
             criteria,
         )
-        poses.append(result.transformation)
+        # ICP aligns frame i onto frame 0, so result.transformation is T_c0<-ci.
+        poses.append(np.linalg.inv(result.transformation))
     return poses
 
 
@@ -392,7 +416,7 @@ def reconstruct_mesh(
 
     total_frames = len(rgbd_images)
     for idx, (rgbd, pose) in enumerate(zip(rgbd_images, poses, strict=True)):
-        volume.integrate(rgbd, intrinsic, np.linalg.inv(pose))
+        volume.integrate(rgbd, intrinsic, pose)
         if progress_callback is not None:
             progress_callback(idx + 1, total_frames)
 

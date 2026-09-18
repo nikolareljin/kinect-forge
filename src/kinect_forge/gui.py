@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
 from tkinter import filedialog, ttk
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -21,7 +21,7 @@ from kinect_forge.presets import capture_preset, reconstruction_preset
 from kinect_forge.reconstruct import reconstruct_mesh
 from kinect_forge.sensors.freenect_v1 import FreenectV1Sensor, probe_device, set_tilt_degs
 from kinect_forge.turntable import get_turntable_preset
-from kinect_forge.viewer import view_dataset, view_mesh
+from kinect_forge.viewer import render_mesh_thumbnail, view_dataset, view_mesh
 
 
 class App:
@@ -190,33 +190,10 @@ class App:
         self._recon_progress_bar["value"] = pct
         self._recon_progress_text.set(f"Frame {current} / {total}")
 
-    def _render_mesh_thumbnail(self, mesh_path: Path) -> bytes | None:
-        """Render a 400x300 PNG thumbnail of the mesh using Open3D offscreen rendering.
-
-        Returns raw PNG bytes, or None if rendering is unavailable.
-        """
-        try:
-            import open3d as o3d
-
-            renderer = o3d.visualization.rendering.OffscreenRenderer(400, 300)
-            mesh = o3d.io.read_triangle_mesh(str(mesh_path))
-            if mesh.is_empty():
-                return None
-            mesh.compute_vertex_normals()
-            mat = o3d.visualization.rendering.MaterialRecord()
-            mat.shader = "defaultLit"
-            renderer.scene.add_geometry("mesh", mesh, mat)
-            bounds = mesh.get_axis_aligned_bounding_box()
-            renderer.setup_camera(60.0, bounds, bounds.get_center())
-            img = renderer.render_to_image()
-            return cast(bytes | None, o3d.io.write_image_to_memory(img, ".png"))
-        except Exception:
-            return None
-
     def _update_thumbnail(self, mesh_path: str) -> None:
         if not mesh_path or not Path(mesh_path).is_file():
             return
-        png = self._render_mesh_thumbnail(Path(mesh_path))
+        png = render_mesh_thumbnail(Path(mesh_path))
         if not png:
             return
         import base64
