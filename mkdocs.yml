@@ -1,0 +1,88 @@
+site_name: kinect-forge
+site_description: >-
+  Turn a Kinect v1 into a 3D scanner on Ubuntu: capture, reconstruct, measure,
+  and export clean meshes.
+site_url: https://nikolareljin.github.io/kinect-forge/
+repo_url: https://github.com/nikolareljin/kinect-forge
+repo_name: nikolareljin/kinect-forge
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  # No Google Fonts: the site should not make a third-party request for text.
+  font: false
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - search.highlight
+    - toc.follow
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+plugins:
+  - search
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/nikolareljin/kinect-forge
+      name: kinect-forge on GitHub
+    - icon: material/printer-3d
+      link: https://nikolareljin.github.io/triaina/
+      name: triaina, prints and cuts the model
+
+nav:
+  - Home: index.md
+  - Get started:
+      - Setup: SETUP.md
+      - Configuration: CONFIG.md
+      - Calibration: CALIBRATION.md
+  - Use:
+      - Capture workflow: CAPTURE_WORKFLOW.md
+      - Reconstruction: RECONSTRUCTION.md
+      - GUI: GUI.md
+      - Troubleshooting: TROUBLESHOOTING.md
+  - Develop:
+      - Architecture: ARCHITECTURE.md
+      - Packaging: PACKAGING.md
+      - Roadmap: ROADMAP.md
+  - About: about.md

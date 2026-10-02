@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+### Added
+- Documentation site on GitHub Pages (MkDocs Material, same theme as triaina): home page, nav over `docs/`, About page, link to the sibling triaina site.
+
 ## 0.2.0 - 2026-09-18
 ### Added
 - `calibration.json` in the working directory is auto-loaded as default intrinsics

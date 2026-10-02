@@ -1,0 +1,71 @@
+name: Docs
+
+# Builds the documentation site on every pull request that touches it, and
+# deploys from main. Building on the pull request is the point: a broken link or
+# a page missing from the nav should fail before it is published, not after.
+#
+# There is deliberately no `concurrency:` block here. The preset declares its
+# own (`ci-helpers-pages-<ref>`, cancel-in-progress false); a second group in the
+# caller leaves the called jobs queued behind the run that started them.
+# Same caller as triaina's pages.yml, so the two sites build the same way.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/**
+      - mkdocs.yml
+      - requirements-docs.txt
+      - .github/workflows/pages.yml
+  pull_request:
+    paths:
+      - docs/**
+      - mkdocs.yml
+      - requirements-docs.txt
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+# Read-only at the workflow level, so anything added to this file later starts
+# with no write scope and has to ask for it. The elevated grant lives on the one
+# job that cannot run without it, below.
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    uses: nikolareljin/ci-helpers/.github/workflows/pages.yml@production
+    # pages and id-token are needed here even on pull-request runs, where
+    # nothing is deployed. GitHub validates a called workflow's declared
+    # permissions when the run starts, before any job-level `if:` is evaluated,
+    # so `deploy: false` does not excuse the caller from granting them ,
+    # granting less fails the whole run with `startup_failure`. Both halves of
+    # that were measured against this preset at @production rather than assumed:
+    # `contents: read` alone startup-failed, and this grant with a read-only
+    # workflow-level default succeeded.
+    #
+    # The cost is that a pull-request build holds those scopes while pip and
+    # MkDocs run. It is bounded, a fork's pull request gets a read-only token
+    # whatever the workflow declares, so only branches pushed by someone who
+    # already has write access are affected, but it is not nothing, and it is a
+    # property of the preset rather than of this repository. https://github.com/nikolareljin/ci-helpers/issues/137 is
+    # the fix: split the deploy job into its own reusable workflow so a
+    # build-only caller can stay at `contents: read`.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    with:
+      python_version: "3.11"
+      requirements_file: "requirements-docs.txt"
+      # --strict turns a broken internal link or an orphaned page into a build
+      # failure. Without it MkDocs prints a warning nobody reads and publishes
+      # the broken page anyway.
+      build_command: "mkdocs build --strict"
+      pages_path: "site"
+      # Both halves matter. Excluding pull requests keeps a proposed change from
+      # publishing itself; requiring main keeps a `workflow_dispatch` run started
+      # from a feature branch from doing the same thing by hand. `push` is
+      # already filtered to main above, so the ref test exists for the dispatch
+      # case, which is exactly the one that reaches this without a branch
+      # filter, and the one the previous hand-rolled workflow gated on.
+      deploy: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}

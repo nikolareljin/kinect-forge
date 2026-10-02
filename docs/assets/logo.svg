@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <title>kinect-forge</title>
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#1E293B" />
+    </linearGradient>
+    <linearGradient id="beamGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.55" />
+      <stop offset="100%" stop-color="#F59E0B" stop-opacity="0.05" />
+    </linearGradient>
+  </defs>
+  <!-- Same tile and grid as the triaina logo, so the two read as a set -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+  <rect x="76" y="76" width="360" height="360" rx="24" fill="none" stroke="#334155" stroke-width="3" stroke-dasharray="12 12" />
+  <line x1="256" y1="40" x2="256" y2="472" stroke="#475569" stroke-width="2" stroke-dasharray="6 6" />
+  <line x1="40" y1="256" x2="472" y2="256" stroke="#475569" stroke-width="2" stroke-dasharray="6 6" />
+  <!-- Depth beam from the sensor down onto the object -->
+  <path d="M 226 150 L 150 300 L 362 300 L 286 150 Z" fill="url(#beamGrad)" />
+  <!-- Kinect bar: body, stand, three lenses -->
+  <rect x="146" y="112" width="220" height="44" rx="22" fill="#CBD5E1" />
+  <rect x="246" y="92" width="20" height="22" rx="4" fill="#94A3B8" />
+  <circle cx="186" cy="134" r="10" fill="#0F172A" />
+  <circle cx="256" cy="134" r="12" fill="#F59E0B" />
+  <circle cx="326" cy="134" r="10" fill="#0F172A" />
+  <!-- Scanned object as a wireframe cube -->
+  <g fill="none" stroke="#F8FAFC" stroke-width="8" stroke-linejoin="round">
+    <path d="M 256 268 L 336 308 L 256 348 L 176 308 Z" />
+    <path d="M 176 308 L 176 388 L 256 428 L 336 388 L 336 308" />
+    <path d="M 256 348 L 256 428" />
+  </g>
+  <g fill="none" stroke="#F59E0B" stroke-width="3" stroke-opacity="0.8">
+    <path d="M 216 288 L 296 328 M 296 288 L 216 328 M 176 348 L 256 388 L 336 348" />
+  </g>
+</svg>
