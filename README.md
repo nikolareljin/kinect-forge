@@ -1,6 +1,6 @@
 # Kinect Forge
 
-Documentation: https://nikolareljin.github.io/kinect-forge/ . Sibling project: [triaina](https://nikolareljin.github.io/triaina/) prints or cuts what you scan.
+Documentation: [nikolareljin.github.io/kinect-forge](https://nikolareljin.github.io/kinect-forge/). Sibling project: [triaina](https://nikolareljin.github.io/triaina/) prints or cuts what you scan.
 
 Kinect Forge is a modular 3D scanning toolkit for Ubuntu that uses Kinect depth cameras to build clean 3D models
 from small objects first, then scales to larger scenes later.
