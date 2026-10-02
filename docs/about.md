@@ -4,8 +4,8 @@ I am Nik Reljin. For 16+ years I have designed, built and run production softwar
 system architecture, backend services, CI/CD, and applied AI (RAG, LLMs,
 embeddings), and I mentor the engineers who work on it. My own projects are
 local-first and privacy-preserving, from a Kinect scanner and a 3D printer to a
-full local AI workstation. They span 70+ public repositories that share one CI
-and release toolchain I wrote, and ship the way production code does: tested,
+full local AI workstation: 50+ public repositories, plus the shared CI and
+release libraries I wrote for them, shipped the way production code is: tested,
 gated, versioned and released.
 
 triaina and kinect-forge are a pair: [kinect-forge](https://nikolareljin.github.io/kinect-forge/)
