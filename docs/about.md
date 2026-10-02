@@ -1,8 +1,10 @@
 # About
 
-I am Nik Reljin, a lead software engineer at Dow Jones with 16+ years of designing,
-building and running software. Most of my own projects are local-first and
-privacy-preserving: tools that run on hardware I already own, with AI where it helps.
+I am Nik Reljin, a senior software engineer with 16+ years of designing, building
+and running production software across backend, DevOps and applied AI (RAG, LLMs,
+embeddings). My own projects are local-first and privacy-preserving, from a Kinect
+scanner and a 3D printer to a full local AI workstation, and they ship the way
+production code does: tested, gated in CI, versioned and released.
 
 triaina and kinect-forge are a pair: [kinect-forge](https://nikolareljin.github.io/kinect-forge/)
 scans a real object into a 3D model, and [triaina](https://nikolareljin.github.io/triaina/)
