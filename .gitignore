@@ -45,3 +45,6 @@ CLAUDE.md
 # Written by PyInstaller at the repo root on each bundle build. Scoped to that
 # one path so it cannot shadow the tracked scripts/pyinstaller.spec.
 /kinect-forge.spec
+
+# MkDocs build output
+site/

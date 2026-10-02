@@ -1,0 +1,8 @@
+# Documentation site.
+#
+# Top-level versions are pinned so the site does not change under us on somebody
+# else's release day. This is not a lockfile: transitive dependencies still
+# float, so a build can still be broken from further down the tree. If that ever
+# happens, replace this with a fully resolved lock rather than widening these.
+mkdocs==1.6.1
+mkdocs-material==9.7.7
