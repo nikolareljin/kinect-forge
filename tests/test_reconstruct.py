@@ -193,3 +193,51 @@ def test_gui_logs_reconstruct_warnings_when_reconstruct_fails(monkeypatch, tmp_p
         )
 
     assert logged == ["Warning: Dataset depth is not registered to colour"]
+
+
+def test_reconstruct_mesh_builds_a_surface_from_a_flat_wall(tmp_path):
+    """End to end through Open3D: a wall 1 m away must come out as a non-empty mesh.
+
+    The legacy ScalableTSDFVolume integrates nothing on Open3D 0.20.0, so every
+    reconstruct failed with "empty mesh"; this test catches such a regression.
+    """
+    import imageio.v3 as iio
+
+    from kinect_forge.config import KinectIntrinsics, ReconstructionConfig
+    from kinect_forge.dataset import DatasetMeta, ensure_dirs, write_metadata
+    from kinect_forge.reconstruct import reconstruct_mesh
+
+    dataset = tmp_path / "wall"
+    color_dir, depth_dir = ensure_dirs(dataset)
+    color = np.full((480, 640, 3), (200, 100, 50), dtype=np.uint8)
+    depth = np.full((480, 640), 1000, dtype=np.uint16)
+    for idx in range(3):
+        iio.imwrite(color_dir / f"color_{idx:06d}.png", color)
+        iio.imwrite(depth_dir / f"depth_{idx:06d}.png", depth)
+    write_metadata(
+        dataset,
+        DatasetMeta(
+            intrinsics=KinectIntrinsics(),
+            depth_scale=1000.0,
+            depth_trunc=3.0,
+            depth_registered=True,
+        ),
+    )
+
+    output = tmp_path / "wall.ply"
+    reconstruct_mesh(dataset, output, ReconstructionConfig())
+
+    import open3d as o3d
+
+    mesh = o3d.io.read_triangle_mesh(output)
+    vertices = np.asarray(mesh.vertices)
+    assert len(vertices) > 1000
+    # Every vertex lies on the wall plane, within one voxel.
+    assert np.allclose(vertices[:, 2], 1.0, atol=0.004)
+    # The wall fills the view: 640 px at fx=525 and 1 m is about 1.22 m wide.
+    width, height = np.ptp(vertices[:, 0]), np.ptp(vertices[:, 1])
+    assert 1.1 < width < 1.3
+    assert 0.8 < height < 1.0
+    # Colour survives fusion, in [0, 1].
+    colors = np.asarray(mesh.vertex_colors)
+    assert np.allclose(colors.mean(axis=0), [200 / 255, 100 / 255, 50 / 255], atol=0.02)

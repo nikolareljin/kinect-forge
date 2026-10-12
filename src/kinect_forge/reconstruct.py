@@ -15,7 +15,7 @@ directions:
   here registers a later frame *onto an earlier one*, so its result is
   camera-to-world and must be inverted before it joins a ``poses`` list.
 
-``ScalableTSDFVolume.integrate`` wants the extrinsic, so a pose is passed to it
+``VoxelBlockGrid.integrate`` wants the extrinsic, so a pose is passed to it
 unchanged. Mixing the two conventions reconstructs every surface twice.
 """
 
@@ -324,6 +324,63 @@ def _estimate_turntable_poses(
     return poses
 
 
+def _integrate_tsdf(
+    rgbd_images: list[o3d.geometry.RGBDImage],
+    intrinsic: o3d.camera.PinholeCameraIntrinsic,
+    poses: list[npt.NDArray[Any]],
+    config: ReconstructionConfig,
+    depth_trunc: float,
+    progress_callback: Callable[[int, int], None] | None = None,
+) -> o3d.geometry.TriangleMesh:
+    """Fuse frames into a TSDF and extract its surface.
+
+    Uses the tensor VoxelBlockGrid: the legacy ScalableTSDFVolume integrates
+    nothing on Open3D 0.20.0, and 0.19.0 has no wheels for Python 3.13+.
+    """
+    device = o3d.core.Device("CPU:0")
+    grid = o3d.t.geometry.VoxelBlockGrid(
+        attr_names=("tsdf", "weight", "color"),
+        attr_dtypes=(o3d.core.float32, o3d.core.float32, o3d.core.float32),
+        attr_channels=(
+            o3d.core.SizeVector([1]),
+            o3d.core.SizeVector([1]),
+            o3d.core.SizeVector([3]),
+        ),
+        voxel_size=config.voxel_length,
+        block_resolution=16,
+        # Initial capacity only; the block hash map grows as the scan needs.
+        # Each 16^3 block holds 5 floats per voxel, about 80 KB.
+        block_count=1000,
+        device=device,
+    )
+    k_matrix = o3d.core.Tensor.from_numpy(
+        np.ascontiguousarray(intrinsic.intrinsic_matrix, dtype=np.float64)
+    )
+    trunc_multiplier = config.sdf_trunc / config.voxel_length
+
+    total_frames = len(rgbd_images)
+    for idx, (rgbd, pose) in enumerate(zip(rgbd_images, poses, strict=True)):
+        # The legacy RGBD depth is already float metres, so depth_scale is 1, and
+        # float depth must come with float colour in [0, 1].
+        depth = o3d.t.geometry.Image.from_legacy(rgbd.depth, device=device)
+        color = o3d.t.geometry.Image.from_legacy(rgbd.color, device=device).to(
+            o3d.core.float32, scale=1.0 / 255.0
+        )
+        extrinsic = o3d.core.Tensor.from_numpy(np.ascontiguousarray(pose, dtype=np.float64))
+        blocks = grid.compute_unique_block_coordinates(
+            depth, k_matrix, extrinsic, 1.0, depth_trunc, trunc_multiplier
+        )
+        grid.integrate(
+            blocks, depth, color, k_matrix, extrinsic, 1.0, depth_trunc, trunc_multiplier
+        )
+        if progress_callback is not None:
+            progress_callback(idx + 1, total_frames)
+
+    # The legacy volume kept every observed voxel; a threshold above zero would
+    # drop surfaces seen in only one or two frames.
+    return grid.extract_triangle_mesh(weight_threshold=0.0).to_legacy()
+
+
 def _clean_mesh(
     mesh: o3d.geometry.TriangleMesh, config: ReconstructionConfig
 ) -> o3d.geometry.TriangleMesh:
@@ -418,19 +475,7 @@ def reconstruct_mesh(
                 config.icp_iterations,
             )
 
-    volume = o3d.pipelines.integration.ScalableTSDFVolume(
-        voxel_length=config.voxel_length,
-        sdf_trunc=config.sdf_trunc,
-        color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8,
-    )
-
-    total_frames = len(rgbd_images)
-    for idx, (rgbd, pose) in enumerate(zip(rgbd_images, poses, strict=True)):
-        volume.integrate(rgbd, intrinsic, pose)
-        if progress_callback is not None:
-            progress_callback(idx + 1, total_frames)
-
-    mesh = volume.extract_triangle_mesh()
+    mesh = _integrate_tsdf(rgbd_images, intrinsic, poses, config, depth_trunc, progress_callback)
     mesh = _clean_mesh(mesh, config)
     if mesh.is_empty():
         raise RuntimeError("Reconstruction produced an empty mesh.")
