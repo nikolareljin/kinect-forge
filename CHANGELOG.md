@@ -2,6 +2,7 @@
 
 ## Unreleased
 ### Added
+- Depth is captured aligned to the RGB image (libfreenect `DEPTH_REGISTERED`), so colour no longer sits ~25 mm off the geometry. `--no-depth-registration` turns it off; `metadata.json` records `depth_registered` (#3).
 - Documentation site on GitHub Pages (MkDocs Material, same theme as triaina): home page, nav over `docs/`, About page, link to the sibling triaina site.
 
 ## 0.2.0 - 2026-09-18

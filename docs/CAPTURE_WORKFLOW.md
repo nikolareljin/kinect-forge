@@ -20,6 +20,20 @@ Parameters to tune:
 - `--auto-stop-patience`: number of stagnant frames before stopping
 - `--auto-stop-delta`: how small change must be to count as stagnant
 
+## Depth-to-colour registration
+
+The Kinect v1 depth and RGB cameras sit about 25 mm apart, so raw depth does not
+line up with the colour image and the colours land beside the geometry. Capture
+asks libfreenect for `DEPTH_REGISTERED`, which aligns depth to the RGB image with
+the device's factory calibration. `metadata.json` records `depth_registered`.
+
+- `--no-depth-registration`: keep raw depth (for example, to compare)
+- 11-bit depth (`depth_format = "11bit"`) is never registered
+- if the freenect bindings lack `DEPTH_REGISTERED`, capture warns and saves raw depth
+
+Calibrate intrinsics on the RGB camera (`kinect-forge calibrate`), since
+registered depth is in the RGB camera's frame.
+
 ## Background masking
 Set depth min/max to reduce background clutter and isolate the object.
 

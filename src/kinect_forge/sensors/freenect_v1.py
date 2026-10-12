@@ -10,6 +10,9 @@ from kinect_forge.sensors.base import RGBDFrame
 @dataclass
 class FreenectV1Config:
     depth_format: str = "mm"
+    # Ask libfreenect for depth aligned to the RGB image (DEPTH_REGISTERED), using
+    # the device's factory registration. The two cameras sit ~25 mm apart.
+    depth_registration: bool = True
 
 
 class FreenectV1Sensor:
@@ -24,6 +27,19 @@ class FreenectV1Sensor:
                 "Ubuntu 24.04+ should rerun ./setup to install freenect==0.1.0."
             ) from exc
         self._freenect = freenect
+
+    @property
+    def depth_registered(self) -> bool:
+        """True when frames come back aligned to the RGB image.
+
+        Only mm depth can be registered, and only when the bindings expose
+        DEPTH_REGISTERED; otherwise frames are unregistered and colour is offset.
+        """
+        return (
+            self._config.depth_registration
+            and self._config.depth_format != "11bit"
+            and hasattr(self._freenect, "DEPTH_REGISTERED")
+        )
 
     @property
     def depth_scale(self) -> float:
@@ -49,6 +65,8 @@ class FreenectV1Sensor:
         depth_format = freenect.DEPTH_MM
         if self._config.depth_format == "11bit":
             depth_format = freenect.DEPTH_11BIT
+        elif self.depth_registered:
+            depth_format = freenect.DEPTH_REGISTERED
         depth, _ = freenect.sync_get_depth(format=depth_format)
         if depth is None:
             raise RuntimeError("Failed to read depth frame from Kinect.")

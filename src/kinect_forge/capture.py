@@ -118,6 +118,7 @@ def capture_frames(
         depth_trunc=config.depth_trunc,
         capture_mode=config.mode,
         depth_format=sensor_depth_format,
+        depth_registered=bool(getattr(sensor, "depth_registered", False)),
         turntable_model=config.turntable_model,
         turntable_diameter_mm=config.turntable_diameter_mm,
         turntable_rotation_seconds=config.turntable_rotation_seconds,

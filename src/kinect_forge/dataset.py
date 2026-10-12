@@ -17,6 +17,7 @@ class DatasetMeta:
     color_format: str = "rgb"
     depth_unit: str = "mm"
     depth_format: str = "mm"
+    depth_registered: bool = False
     turntable_model: str | None = None
     turntable_diameter_mm: int | None = None
     turntable_rotation_seconds: float | None = None
@@ -30,6 +31,7 @@ class DatasetMeta:
             "color_format": self.color_format,
             "depth_unit": self.depth_unit,
             "depth_format": self.depth_format,
+            "depth_registered": self.depth_registered,
             "turntable_model": self.turntable_model,
             "turntable_diameter_mm": self.turntable_diameter_mm,
             "turntable_rotation_seconds": self.turntable_rotation_seconds,
@@ -60,6 +62,7 @@ def load_metadata(root: Path) -> DatasetMeta:
         color_format=payload.get("color_format", "rgb"),
         depth_unit=payload.get("depth_unit", "mm"),
         depth_format=payload.get("depth_format", "mm"),
+        depth_registered=bool(payload.get("depth_registered", False)),
         turntable_model=payload.get("turntable_model"),
         turntable_diameter_mm=payload.get("turntable_diameter_mm"),
         turntable_rotation_seconds=payload.get("turntable_rotation_seconds"),
