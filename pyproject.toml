@@ -15,10 +15,7 @@ keywords = ["kinect", "3d", "scanner", "depth", "open3d"]
 # Core deps are intentionally minimal; sensor backends are optional extras.
 dependencies = [
   "numpy>=1.26",
-  # 0.20.0 integrates nothing into ScalableTSDFVolume, so every reconstruct
-  # ends in "empty mesh". tests/test_reconstruct.py catches it; lift the cap
-  # when that test passes on a newer release.
-  "open3d>=0.18,<0.20",
+  "open3d>=0.18",
   "opencv-python>=4.9",
   "imageio>=2.34",
   "trimesh>=4.4",

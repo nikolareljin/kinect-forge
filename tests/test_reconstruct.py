@@ -128,8 +128,8 @@ def test_estimate_turntable_poses_inverts_the_icp_result(monkeypatch):
 def test_reconstruct_mesh_builds_a_surface_from_a_flat_wall(tmp_path):
     """End to end through Open3D: a wall 1 m away must come out as a non-empty mesh.
 
-    Open3D 0.20.0 integrates nothing into ScalableTSDFVolume, so every
-    reconstruct fails with "empty mesh"; this test is what catches such a release.
+    The legacy ScalableTSDFVolume integrates nothing on Open3D 0.20.0, so every
+    reconstruct failed with "empty mesh"; this test catches such a regression.
     """
     import imageio.v3 as iio
 
