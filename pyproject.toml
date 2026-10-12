@@ -15,7 +15,9 @@ keywords = ["kinect", "3d", "scanner", "depth", "open3d"]
 # Core deps are intentionally minimal; sensor backends are optional extras.
 dependencies = [
   "numpy>=1.26",
-  "open3d>=0.18",
+  # 0.18 accepts only str paths in o3d.io and crashes on numpy 2; 0.19 is the
+  # oldest release that runs the test suite.
+  "open3d>=0.19",
   "opencv-python>=4.9",
   "imageio>=2.34",
   "trimesh>=4.4",
