@@ -23,6 +23,7 @@ python -m PyInstaller \
   --windowed \
   --name kinect-forge \
   --add-data "docs:docs" \
+  --add-data "src/kinect_forge/presets.json:kinect_forge" \
   --collect-submodules open3d \
   --hidden-import tkinter \
   --hidden-import tkinter.ttk \

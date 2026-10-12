@@ -23,8 +23,6 @@ from kinect_forge.reconstruct import reconstruct_mesh
 from kinect_forge.sensors.freenect_v1 import (
     MOTOR_NOT_RESPONDING_MESSAGE,
     REGISTRATION_FALLBACK_MESSAGE,
-    probe_device,
-    set_tilt_degs,
 )
 from kinect_forge.sensors.process_sensor import ProcessSensor
 from kinect_forge.turntable import get_turntable_preset
@@ -40,9 +38,11 @@ class App:
         self._live_preview_window: tk.Toplevel | None = None
         self._live_preview_label: ttk.Label | None = None
         self._live_preview_running = False
-        # The sensor currently streaming (live preview or capture). Tilt has to go
-        # through it, since its process holds the device.
+        # The one sensor that owns the Kinect (live preview, a capture, or a tilt
+        # request); see _claim_sensor. Tilt goes through it while it streams, since
+        # its process holds the device.
         self._active_sensor: ProcessSensor | None = None
+        self._sensor_lock = threading.Lock()
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -178,6 +178,34 @@ class App:
     def _set_widget_state(self, widget: tk.Widget, states: list[str]) -> None:
         widget.state(states)  # type: ignore[attr-defined]
 
+    def _claim_sensor(self, label: str) -> ProcessSensor | None:
+        """Give the Kinect to one user at a time, or log why not and return None.
+
+        Live preview, both capture buttons and tilt each open the device in their own
+        process; a second open would fail with LIBUSB_ERROR_BUSY.
+        """
+        with self._sensor_lock:
+            if self._active_sensor is not None:
+                self._log(
+                    f"[{label}] The Kinect is in use by the live preview or a capture. "
+                    "Close the preview or wait for the capture to finish."
+                )
+                return None
+            try:
+                sensor = ProcessSensor()
+            except Exception as exc:  # pragma: no cover - freenect missing
+                self._log(f"[{label}] {exc}")
+                self._log("Ensure freenect is installed in this Python environment.")
+                return None
+            self._active_sensor = sensor
+            return sensor
+
+    def _release_sensor(self, sensor: ProcessSensor) -> None:
+        sensor.stop()
+        with self._sensor_lock:
+            if self._active_sensor is sensor:
+                self._active_sensor = None
+
     def _run_task(self, label: str, fn: Callable[[], None]) -> None:
         def runner() -> None:
             self._log(f"[{label}] started")
@@ -266,11 +294,15 @@ class App:
         )
 
         def pipeline_capture() -> None:
-            try:
-                sensor = ProcessSensor()
-            except Exception as exc:  # pragma: no cover
-                self._log(f"[pipeline/capture] {exc}")
+            sensor = self._claim_sensor("pipeline/capture")
+            if sensor is None:
                 return
+            try:
+                pipeline_capture_with(sensor)
+            finally:
+                self._release_sensor(sensor)
+
+        def pipeline_capture_with(sensor: ProcessSensor) -> None:
             if not sensor.depth_registered:
                 self._log(f"[pipeline/capture] {REGISTRATION_FALLBACK_MESSAGE}")
 
@@ -299,6 +331,7 @@ class App:
                 return Path(self.capture_output.get()), config
 
             output_path, config = self._call_on_ui_thread(prepare_capture_state)
+            self._log("Opening Kinect...")
             capture_frames(sensor, output_path, config)
 
             def mark_capture_done() -> None:
@@ -438,7 +471,20 @@ class App:
             freenect_label.config(text=f"Freenect: not available ({exc})")
 
         def check() -> None:
-            ok = probe_device()
+            # Not probe_device(): that opens the Kinect in this process, which hangs
+            # under Tk and then keeps the device from the preview and capture.
+            sensor = self._claim_sensor("status")
+            if sensor is None:
+                return
+            self._log("Opening Kinect...")
+            try:
+                sensor.start()
+                ok = True
+            except RuntimeError as exc:
+                self._log(f"[status] {exc}")
+                ok = False
+            finally:
+                self._release_sensor(sensor)
             if ok:
                 self._log("Kinect v1 backend detected and streaming.")
             else:
@@ -463,12 +509,15 @@ class App:
         action_frame.grid(row=0, column=0, columnspan=3, sticky=tk.W, padx=8, pady=8)
 
         def run_capture() -> None:
-            try:
-                sensor = ProcessSensor()
-            except Exception as exc:  # pragma: no cover
-                self._log(f"Capture failed: {exc}")
-                self._log("Ensure freenect is installed in this Python environment.")
+            sensor = self._claim_sensor("capture")
+            if sensor is None:
                 return
+            try:
+                run_capture_with(sensor)
+            finally:
+                self._release_sensor(sensor)
+
+        def run_capture_with(sensor: ProcessSensor) -> None:
             if not sensor.depth_registered:
                 self._log(REGISTRATION_FALLBACK_MESSAGE)
             if self.capture_profile.get():
@@ -604,15 +653,28 @@ class App:
 
         def tilt_to(angle: float) -> None:
             def work() -> None:
+                streaming = self._active_sensor
+                own: ProcessSensor | None = None
                 try:
-                    sensor = self._active_sensor
-                    ok = sensor.set_tilt(angle) if sensor is not None else set_tilt_degs(angle)
+                    if streaming is not None:
+                        ok = streaming.set_tilt(angle)
+                    else:
+                        # Nothing streaming: open the Kinect just for this request,
+                        # in its own process like everything else in the GUI.
+                        own = self._claim_sensor("tilt")
+                        if own is None:
+                            return
+                        self._log("Opening Kinect...")
+                        ok = own.set_tilt(angle)
                     if ok:
                         self._log(f"Tilt set to {angle} degrees.")
                     else:
                         self._log(MOTOR_NOT_RESPONDING_MESSAGE)
                 except Exception as exc:  # pragma: no cover
                     self._log(f"Tilt failed: {exc}")
+                finally:
+                    if own is not None:
+                        self._release_sensor(own)
 
             # Off the UI thread: opening the device can take several seconds.
             threading.Thread(target=work, daemon=True).start()
@@ -757,10 +819,8 @@ class App:
         if self._live_preview_running:
             self._log("Live preview already open.")
             return
-        try:
-            sensor = ProcessSensor()
-        except Exception as exc:  # pragma: no cover
-            self._log(f"Live preview failed: {exc}")
+        sensor = self._claim_sensor("live preview")
+        if sensor is None:
             return
 
         window = tk.Toplevel(self.root)
@@ -778,7 +838,6 @@ class App:
             try:
                 self._log("Opening Kinect...")
                 sensor.start()
-                self._active_sensor = sensor
                 while self._live_preview_running:
                     frame = sensor.get_frame()
                     ppm = self._compose_live_preview(frame.color, frame.depth)
@@ -786,9 +845,7 @@ class App:
             except Exception as exc:  # pragma: no cover
                 self._log(f"Live preview error: {exc}")
             finally:
-                if self._active_sensor is sensor:
-                    self._active_sensor = None
-                sensor.stop()
+                self._release_sensor(sensor)
                 self.root.after(0, self._close_live_preview)
 
         threading.Thread(target=runner, daemon=True).start()

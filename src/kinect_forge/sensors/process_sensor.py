@@ -17,6 +17,7 @@ from __future__ import annotations
 import multiprocessing as mp
 import queue
 import threading
+from collections.abc import Callable
 from multiprocessing.connection import Connection
 from typing import Any
 
@@ -56,14 +57,26 @@ def _run_child(config: FreenectV1Config, conn: Connection, commands: Any, stop: 
         conn.close()
 
 
+# One open of a Kinect v1 takes about 10 s on the hardware tested, and the child
+# retries a failed open up to three times.
+_START_TIMEOUT = 45.0
+
+
 class ProcessSensor:
     """Drop-in for FreenectV1Sensor (start/get_frame/stop) backed by a child process."""
 
-    def __init__(self, config: FreenectV1Config | None = None, timeout: float = 5.0) -> None:
+    def __init__(
+        self,
+        config: FreenectV1Config | None = None,
+        timeout: float = 5.0,
+        _child: Callable[..., None] = _run_child,
+    ) -> None:
         self._config = config or FreenectV1Config()
         # Imports freenect, so a missing binding fails here as it does for
         # FreenectV1Sensor; it does not open the device.
         self._local = FreenectV1Sensor(self._config)
+        # The child's entry point; tests replace it with one that needs no Kinect.
+        self._child = _child
         self._timeout = timeout
         self._process: Any = None
         self._conn: Connection | None = None
@@ -75,7 +88,14 @@ class ProcessSensor:
         self._seq = 0
         self._seen = 0
         self._error: str | None = None
+        # Bumped on every spawn so a reader thread left from an earlier child cannot
+        # report that child's exit into the current one.
+        self._generation = 0
         self._tilt_results: queue.Queue[tuple[bool, str | None]] = queue.Queue()
+        # start() can be reached from a capture thread and from a tilt request at once.
+        self._lifecycle = threading.Lock()
+        # One tilt request in flight at a time, so replies cannot be swapped.
+        self._tilt_lock = threading.Lock()
 
     @property
     def depth_registered(self) -> bool:
@@ -86,46 +106,65 @@ class ProcessSensor:
         return self._local.depth_scale
 
     def start(self) -> None:
-        if self._process is not None:
-            return
+        with self._lifecycle:
+            if self._process is not None:
+                return
+            try:
+                self._spawn()
+                self._wait_for_frame(_START_TIMEOUT)
+            except BaseException:
+                # Do not leave a stalled child holding the USB device, and let a
+                # later start() try again from scratch.
+                self._shutdown()
+                raise
+
+    def _spawn(self) -> None:
+        with self._cond:
+            self._generation += 1
+            self._frame = None
+            self._seq = 0
+            self._seen = 0
+            self._error = None
+        generation = self._generation
         ctx = mp.get_context("spawn")
         parent_conn, child_conn = ctx.Pipe(duplex=False)
         self._commands = ctx.Queue()
         self._stop = ctx.Event()
         self._process = ctx.Process(
-            target=_run_child,
+            target=self._child,
             args=(self._config, child_conn, self._commands, self._stop),
             daemon=True,
         )
         self._process.start()
         child_conn.close()
         self._conn = parent_conn
-        self._reader = threading.Thread(target=self._read, daemon=True)
+        self._reader = threading.Thread(
+            target=self._read, args=(parent_conn, generation), daemon=True
+        )
         self._reader.start()
-        # Opening the device takes a few seconds and can be retried by the child.
-        self._wait_for_frame(self._timeout + 10.0)
 
-    def _read(self) -> None:
-        assert self._conn is not None
+    def _read(self, conn: Connection, generation: int) -> None:
         try:
             while True:
-                kind, first, second = self._conn.recv()
+                kind, first, second = conn.recv()
                 if kind == "frame":
                     with self._cond:
+                        if generation != self._generation:
+                            return
                         self._frame = RGBDFrame(color=first, depth=second)
                         self._seq += 1
                         self._cond.notify_all()
                 elif kind == "tilt":
                     self._tilt_results.put((bool(first), second))
                 else:
-                    self._fail(str(first))
+                    self._fail(str(first), generation)
                     return
         except (EOFError, OSError):
-            self._fail("The Kinect process exited.")
+            self._fail("The Kinect process exited.", generation)
 
-    def _fail(self, message: str) -> None:
+    def _fail(self, message: str, generation: int) -> None:
         with self._cond:
-            if self._error is None:
+            if generation == self._generation and self._error is None:
                 self._error = message
             self._cond.notify_all()
 
@@ -153,25 +192,43 @@ class ProcessSensor:
         """Tilt through the child, which holds the device. Same result as set_tilt_degs."""
         if self._process is None:
             self.start()
-        self._commands.put(("tilt", float(angle)))
-        try:
-            responding, error = self._tilt_results.get(timeout=self._timeout)
-        except queue.Empty as exc:
-            raise RuntimeError("The Kinect process did not answer the tilt request.") from exc
+        with self._tilt_lock:
+            # A reply that arrived after an earlier request timed out is stale.
+            while not self._tilt_results.empty():
+                self._tilt_results.get_nowait()
+            self._commands.put(("tilt", float(angle)))
+            try:
+                responding, error = self._tilt_results.get(timeout=self._timeout)
+            except queue.Empty as exc:
+                raise RuntimeError("The Kinect process did not answer the tilt request.") from exc
         if error is not None:
             raise RuntimeError(error)
         return responding
 
     def stop(self) -> None:
+        with self._lifecycle:
+            self._shutdown()
+
+    def _shutdown(self) -> None:
         if self._process is None:
             return
         self._stop.set()
-        if self._conn is not None:
-            # Unblocks a child waiting to send a frame nobody will read.
-            self._conn.close()
+        # The reader thread keeps draining the pipe, so the child is never stuck
+        # sending; it sees the stop event after its current frame and exits, which
+        # ends the reader with EOF. Only a child stuck inside libfreenect needs
+        # terminating. The pipe is closed after that: closing it under a reader
+        # that is still in recv() breaks that thread.
         self._process.join(timeout=3.0)
         if self._process.is_alive():
             self._process.terminate()
             self._process.join(timeout=1.0)
+        if self._reader is not None:
+            self._reader.join(timeout=1.0)
+            self._reader = None
+        if self._conn is not None:
+            self._conn.close()
+        # A queue with unread items would otherwise block this process at exit.
+        self._commands.cancel_join_thread()
+        self._commands.close()
         self._process = None
         self._conn = None
