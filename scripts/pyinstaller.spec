@@ -11,7 +11,8 @@ a = Analysis(
     ["src/kinect_forge/__main__.py"],
     pathex=[],
     binaries=[],
-    datas=[("docs", "docs")],
+    # presets.json sits next to presets.py, which reads it from its own directory.
+    datas=[("docs", "docs"), ("src/kinect_forge/presets.json", "kinect_forge")],
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},

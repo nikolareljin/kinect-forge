@@ -1,8 +1,9 @@
 # Configuration
 
 ## Presets
-Presets are loaded from `config/presets.json` at runtime. You can override the
-path with `KINECT_FORGE_PRESETS=/path/to/presets.json`.
+Presets are loaded at runtime from `presets.json`, which ships inside the
+`kinect_forge` package (`src/kinect_forge/presets.json` in a checkout). You can
+override the path with `KINECT_FORGE_PRESETS=/path/to/presets.json`.
 
 Groups:
 - `capture`: capture defaults (fps, frames, depth range, masking).
@@ -15,5 +16,5 @@ Capture fields can also include tilt sweep options:
 
 Example:
 ```bash
-export KINECT_FORGE_PRESETS=/home/nikos/my-presets.json
+export KINECT_FORGE_PRESETS="$HOME/my-presets.json"
 ```

@@ -3,7 +3,7 @@
     "small-object": {
       "fps": 15.0,
       "frames": 220,
-      "depth_min": 0.2,
+      "depth_min": 0.4,
       "depth_max": 1.2,
       "mask_background": true,
       "auto_stop": true,

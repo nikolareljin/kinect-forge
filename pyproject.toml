@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kinect-forge"
-version = "0.2.1"
+version = "0.2.2"
 description = "Kinect-based 3D scanning toolkit for Ubuntu"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -47,6 +47,11 @@ bundle = [
 
 [project.scripts]
 kinect-forge = "kinect_forge.cli:app"
+
+[tool.setuptools.package-data]
+# Without this the wheel carries only .py files, and every preset lookup fails
+# with "Preset config not found" outside a source checkout.
+kinect_forge = ["presets.json"]
 
 [tool.ruff]
 line-length = 100

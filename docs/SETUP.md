@@ -99,7 +99,7 @@ CLI example:
 python -m kinect_forge capture --capture-preset small-object --output captures
 ```
 
-Preset configuration lives in `config/presets.json`. You can override with:
+Preset configuration lives in `src/kinect_forge/presets.json` and is installed with the package. You can override with:
 ```bash
 export KINECT_FORGE_PRESETS=/path/to/presets.json
 ```
@@ -109,6 +109,19 @@ Kinect v1 supports tilt up/down (no left/right). Use:
 ```bash
 python -m kinect_forge tilt --angle 10
 ```
+
+Tilt works while frames are streaming (live preview, tilt sweep), through
+libfreenect's sync API.
+
+Kinect for Windows (USB ID `045e:02bf`) and Xbox model 1473 route the motor and
+accelerometer through the audio device. When libfreenect cannot open that device it
+prints `Could not open audio: <error code>`, the accelerometer reads 0,0,0 and the motor does
+not move; the usual cause is that the audio firmware (`audios.bin`) is not
+installed. kinect-forge detects this and
+reports it: `tilt` exits with code 1 and capture logs a warning instead of claiming
+the tilt worked. Capture itself is unaffected. The firmware is Microsoft's and is
+not shipped here; libfreenect's `fwfetcher.py` and its README describe how to fetch
+and install it.
 
 Tilt sweep during capture (CLI):
 ```bash

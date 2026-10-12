@@ -7,7 +7,10 @@ from typing import Any, cast
 
 from kinect_forge.config import ReconstructionConfig
 
-_DEFAULT_PRESETS_PATH = Path(__file__).resolve().parents[2] / "config" / "presets.json"
+# Shipped inside the package (see package-data in pyproject.toml) so an installed
+# wheel finds it; it used to sit in config/ at the repository root, which only a
+# source checkout has.
+_DEFAULT_PRESETS_PATH = Path(__file__).resolve().parent / "presets.json"
 
 
 def _load_presets() -> dict[str, Any]:

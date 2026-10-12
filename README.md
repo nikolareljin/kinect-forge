@@ -91,7 +91,7 @@ python -m kinect_forge reconstruct --input-dir scans/gear --output-mesh scans/ge
 ```
 
 Export formats: use `.ply`, `.obj`, `.stl`, or `.glb` in `--output-mesh`.
-Presets: `small`, `medium`, `large`, `small-object`, `face-scan` (see `config/presets.json`).
+Presets: `small`, `medium`, `large`, `small-object`, `face-scan` (see `src/kinect_forge/presets.json`).
 
 Launch GUI:
 ```bash

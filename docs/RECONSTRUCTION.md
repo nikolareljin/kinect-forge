@@ -13,7 +13,7 @@
 - `small-object`: extra detail for keychains, pots, and small parts
 - `face-scan`: tuned for faces at ~0.6–1.2m with minimal motion
 
-Presets are loaded from `config/presets.json`. See `docs/CONFIG.md`.
+Presets are loaded from `src/kinect_forge/presets.json` (installed with the package). See `docs/CONFIG.md`.
 
 ## Key parameters
 - `voxel_length`: smaller values give more detail but require more compute

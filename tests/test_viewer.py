@@ -37,3 +37,31 @@ def test_thumbnail_camera_handles_a_degenerate_mesh() -> None:
     center, eye, _ = _thumbnail_camera(_Bounds([0.0, 0.0, 0.0], [0.0, 0.0, 0.0]))
 
     assert float(np.linalg.norm(np.asarray(eye) - np.asarray(center))) > 0.0
+
+
+def test_mesh_figure_uses_vertex_colours() -> None:
+    import open3d as o3d
+
+    from kinect_forge.viewer import _mesh_figure
+
+    mesh = o3d.geometry.TriangleMesh.create_box()
+    mesh.paint_uniform_color([1.0, 0.5, 0.0])
+
+    trace = _mesh_figure(mesh).data[0]
+
+    assert trace.color is None
+    assert len(trace.vertexcolor) == len(mesh.vertices)
+    assert trace.vertexcolor[0] == "rgb(255,127,0)"
+
+
+def test_mesh_figure_without_colours_and_views_from_the_sensor() -> None:
+    import open3d as o3d
+
+    from kinect_forge.viewer import _mesh_figure
+
+    fig = _mesh_figure(o3d.geometry.TriangleMesh.create_box())
+
+    assert fig.data[0].color == "#6d8cff"
+    camera = fig.layout.scene.camera
+    assert (camera.up.x, camera.up.y, camera.up.z) == (0, -1, 0)
+    assert camera.eye.z < 0

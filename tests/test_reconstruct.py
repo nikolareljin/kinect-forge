@@ -1,4 +1,5 @@
 import numpy as np
+import open3d as o3d
 
 from kinect_forge.reconstruct import _interpolate_rigid_transform, _loop_closure_residual
 
@@ -241,3 +242,21 @@ def test_reconstruct_mesh_builds_a_surface_from_a_flat_wall(tmp_path):
     # Colour survives fusion, in [0, 1].
     colors = np.asarray(mesh.vertex_colors)
     assert np.allclose(colors.mean(axis=0), [200 / 255, 100 / 255, 50 / 255], atol=0.02)
+
+
+def test_clean_mesh_fills_small_holes():
+    from kinect_forge.config import ReconstructionConfig
+    from kinect_forge.reconstruct import _clean_mesh
+
+    sphere = o3d.geometry.TriangleMesh.create_sphere(0.1, resolution=20)
+    sphere.paint_uniform_color([1.0, 0.5, 0.0])
+    sphere.triangles = o3d.utility.Vector3iVector(np.asarray(sphere.triangles)[3:])
+
+    def cleaned(radius: float) -> o3d.geometry.TriangleMesh:
+        config = ReconstructionConfig(smooth_iterations=0, fill_hole_radius=radius)
+        return _clean_mesh(o3d.geometry.TriangleMesh(sphere), config)
+
+    assert len(cleaned(0.0).triangles) == len(sphere.triangles)
+    filled = cleaned(0.05)
+    assert len(filled.triangles) > len(sphere.triangles)
+    assert filled.has_vertex_colors()

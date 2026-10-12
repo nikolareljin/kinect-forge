@@ -391,8 +391,11 @@ def _clean_mesh(
     mesh.remove_unreferenced_vertices()
     if config.smooth_iterations > 0:
         mesh = mesh.filter_smooth_taubin(number_of_iterations=config.smooth_iterations)
-    if config.fill_hole_radius > 0 and hasattr(mesh, "fill_holes"):
-        mesh = mesh.fill_holes(config.fill_hole_radius)
+    if config.fill_hole_radius > 0:
+        # Only the tensor mesh has fill_holes. This used to test the legacy mesh
+        # for it, which never has it, so the setting did nothing.
+        tmesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh)
+        mesh = tmesh.fill_holes(hole_size=config.fill_hole_radius).to_legacy()
     mesh.compute_vertex_normals()
     return mesh
 

@@ -13,9 +13,8 @@ name: Auto Tag Release
 #   * `auto-tag.yml`, not `auto-tag-release.yml`, from ci-helpers. The latter adds
 #     a dispatch job that statically declares `actions: write`, and GitHub
 #     validates a reusable workflow's permissions before running it, so every
-#     caller must grant that scope even when the job is skipped. Nothing here
-#     needs the dispatch: `package.yml` already fires on the tag and publishes the
-#     GitHub Release with its artifacts.
+#     caller must grant that scope even when the job is skipped. The `package`
+#     job below builds the release instead (see its comment).
 #
 #   * `update_production_tag: false`. That step runs `./scripts/create_production.sh`
 #     to advance a floating `production` ref. This repository has neither the
@@ -42,3 +41,22 @@ jobs:
     uses: nikolareljin/ci-helpers/.github/workflows/auto-tag.yml@production
     with:
       update_production_tag: false
+
+  # A tag pushed with the workflow's own GITHUB_TOKEN does not start other
+  # workflows, so `package.yml` never fires for the tag created above; 0.2.1
+  # needed a manual Package run for its wheel and sdist. Build here instead, from
+  # the merge commit the tag points at. `package.yml` still covers a tag pushed by
+  # hand and manual runs.
+  package:
+    needs: tag
+    if: needs.tag.outputs.version != ''
+    uses: nikolareljin/ci-helpers/.github/workflows/release-build.yml@production
+    permissions:
+      contents: write
+    with:
+      python_version: "3.12"
+      working_directory: "."
+      build_command: "./update && ./scripts/package.sh"
+      artifact_paths: "dist/*"
+      upload_artifact: true
+      release_tag: ${{ needs.tag.outputs.version }}
