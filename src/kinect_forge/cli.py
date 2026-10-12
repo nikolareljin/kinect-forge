@@ -13,6 +13,7 @@ from kinect_forge.measure import measure_mesh
 from kinect_forge.presets import capture_preset, reconstruction_preset
 from kinect_forge.reconstruct import reconstruct_mesh
 from kinect_forge.sensors.freenect_v1 import (
+    REGISTRATION_FALLBACK_MESSAGE,
     FreenectV1Config,
     FreenectV1Sensor,
     probe_device,
@@ -118,9 +119,7 @@ def capture(
         auto_stop_delta = profile["auto_stop_delta"]
     sensor = FreenectV1Sensor(FreenectV1Config(depth_registration=depth_registration))
     if depth_registration and not sensor.depth_registered:
-        console.print(
-            "[yellow]freenect has no DEPTH_REGISTERED; depth will not be aligned to colour.[/yellow]"
-        )
+        console.print(f"[yellow]{REGISTRATION_FALLBACK_MESSAGE}[/yellow]")
     config = CaptureConfig(
         frames=frames,
         fps=fps,

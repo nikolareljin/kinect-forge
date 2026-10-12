@@ -31,7 +31,7 @@ import numpy.typing as npt
 import open3d as o3d
 
 from kinect_forge.config import ReconstructionConfig
-from kinect_forge.dataset import list_frame_pairs, load_metadata
+from kinect_forge.dataset import DatasetMeta, list_frame_pairs, load_metadata
 from kinect_forge.export import write_mesh
 
 
@@ -340,6 +340,21 @@ def _clean_mesh(
     return mesh
 
 
+def _warn_on_metadata(meta: DatasetMeta, depth_scale: float) -> None:
+    if meta.depth_format == "11bit" and depth_scale >= 999.0:
+        warnings.warn(
+            "Dataset captured with DEPTH_11BIT but depth_scale=1000.0. "
+            "Metric scale will be incorrect. Recapture using DEPTH_MM (default).",
+            stacklevel=3,
+        )
+    elif not meta.depth_registered:
+        warnings.warn(
+            "Dataset depth is not registered to colour; colours may sit ~25 mm off "
+            "the geometry. Recapture with depth registration on (default).",
+            stacklevel=3,
+        )
+
+
 def reconstruct_mesh(
     input_dir: Path,
     output_mesh: Path,
@@ -354,12 +369,7 @@ def reconstruct_mesh(
     depth_scale = config.depth_scale if config.depth_scale > 0 else meta.depth_scale
     depth_trunc = config.depth_trunc if config.depth_trunc > 0 else meta.depth_trunc
 
-    if meta.depth_format == "11bit" and depth_scale >= 999.0:
-        warnings.warn(
-            "Dataset captured with DEPTH_11BIT but depth_scale=1000.0. "
-            "Metric scale will be incorrect. Recapture using DEPTH_MM (default).",
-            stacklevel=2,
-        )
+    _warn_on_metadata(meta, depth_scale)
 
     pairs = _select_keyframes(pairs, depth_scale, config.keyframe_threshold)
     if not pairs:

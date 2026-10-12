@@ -57,3 +57,31 @@ def test_capture_records_whether_depth_was_registered(monkeypatch, tmp_path):
     capture_frames(sensor, tmp_path, CaptureConfig(frames=1, fps=0, warmup=0))
 
     assert json.loads((tmp_path / "metadata.json").read_text())["depth_registered"] is True
+
+
+def test_capture_cli_warns_when_registration_is_unavailable(monkeypatch, tmp_path):
+    from typer.testing import CliRunner
+
+    from kinect_forge import cli
+
+    monkeypatch.setitem(sys.modules, "freenect", _fake_freenect(False))
+    monkeypatch.setattr(cli, "capture_frames", lambda *args, **kwargs: None)
+
+    result = CliRunner().invoke(cli.app, ["capture", "--output", str(tmp_path / "scan")])
+
+    assert result.exit_code == 0, result.output
+    assert "DEPTH_REGISTERED" in result.output
+
+
+def test_capture_cli_is_quiet_when_registration_works(monkeypatch, tmp_path):
+    from typer.testing import CliRunner
+
+    from kinect_forge import cli
+
+    monkeypatch.setitem(sys.modules, "freenect", _fake_freenect(True))
+    monkeypatch.setattr(cli, "capture_frames", lambda *args, **kwargs: None)
+
+    result = CliRunner().invoke(cli.app, ["capture", "--output", str(tmp_path / "scan")])
+
+    assert result.exit_code == 0, result.output
+    assert "DEPTH_REGISTERED" not in result.output

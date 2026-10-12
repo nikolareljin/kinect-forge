@@ -6,6 +6,10 @@ import numpy as np
 
 from kinect_forge.sensors.base import RGBDFrame
 
+REGISTRATION_FALLBACK_MESSAGE = (
+    "freenect has no DEPTH_REGISTERED; depth will not be aligned to colour."
+)
+
 
 @dataclass
 class FreenectV1Config:

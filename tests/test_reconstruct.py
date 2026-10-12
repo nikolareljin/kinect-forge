@@ -123,3 +123,49 @@ def test_estimate_turntable_poses_inverts_the_icp_result(monkeypatch):
 
     for got, want in zip(estimated, poses, strict=True):
         assert np.allclose(got, want, atol=1e-9)
+
+
+def _meta(**kwargs):
+    from kinect_forge.config import KinectIntrinsics
+    from kinect_forge.dataset import DatasetMeta
+
+    return DatasetMeta(intrinsics=KinectIntrinsics(), depth_scale=1000.0, depth_trunc=3.0, **kwargs)
+
+
+def test_unregistered_dataset_warns_about_colour_offset():
+    import pytest
+
+    from kinect_forge.reconstruct import _warn_on_metadata
+
+    with pytest.warns(UserWarning, match="not registered"):
+        _warn_on_metadata(_meta(depth_registered=False), 1000.0)
+
+
+def test_registered_dataset_does_not_warn():
+    import warnings
+
+    from kinect_forge.reconstruct import _warn_on_metadata
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        _warn_on_metadata(_meta(depth_registered=True), 1000.0)
+
+
+def test_gui_logs_reconstruct_warnings(monkeypatch, tmp_path):
+    import types
+    import warnings
+
+    from kinect_forge import gui
+
+    def fake_reconstruct(*args, **kwargs):
+        warnings.warn("Dataset depth is not registered to colour", stacklevel=2)
+
+    monkeypatch.setattr(gui, "reconstruct_mesh", fake_reconstruct)
+    logged: list[str] = []
+    app = types.SimpleNamespace(_log=logged.append)
+
+    gui.App._reconstruct_logging_warnings(
+        app, tmp_path, tmp_path / "m.ply", None, lambda c, t: None
+    )
+
+    assert logged == ["Warning: Dataset depth is not registered to colour"]

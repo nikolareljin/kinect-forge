@@ -30,6 +30,7 @@ the device's factory calibration. `metadata.json` records `depth_registered`.
 - `--no-depth-registration`: keep raw depth (for example, to compare)
 - 11-bit depth (`depth_format = "11bit"`) is never registered
 - if the freenect bindings lack `DEPTH_REGISTERED`, capture warns and saves raw depth
+- `reconstruct` warns when a dataset was captured without registration (all datasets from 0.2.0 and earlier)
 
 Calibrate intrinsics on the RGB camera (`kinect-forge calibrate`), since
 registered depth is in the RGB camera's frame.
