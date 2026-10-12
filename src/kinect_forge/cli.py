@@ -12,7 +12,13 @@ from kinect_forge.config import CaptureConfig, KinectIntrinsics, ReconstructionC
 from kinect_forge.measure import measure_mesh
 from kinect_forge.presets import capture_preset, reconstruction_preset
 from kinect_forge.reconstruct import reconstruct_mesh
-from kinect_forge.sensors.freenect_v1 import FreenectV1Sensor, probe_device, set_tilt_degs
+from kinect_forge.sensors.freenect_v1 import (
+    REGISTRATION_FALLBACK_MESSAGE,
+    FreenectV1Config,
+    FreenectV1Sensor,
+    probe_device,
+    set_tilt_degs,
+)
 from kinect_forge.turntable import get_turntable_preset
 from kinect_forge.viewer import view_dataset, view_mesh
 
@@ -96,6 +102,9 @@ def capture(
     tilt_max: float = typer.Option(10.0, help="Tilt sweep max angle (deg)"),
     tilt_step: float = typer.Option(5.0, help="Tilt sweep step (deg)"),
     tilt_hold_frames: int = typer.Option(30, help="Frames to hold before next tilt"),
+    depth_registration: bool = typer.Option(
+        True, help="Align depth to the RGB image (libfreenect DEPTH_REGISTERED)"
+    ),
 ) -> None:
     """Capture RGB-D frames using Kinect v1 (libfreenect)."""
     if capture_preset_name:
@@ -108,7 +117,9 @@ def capture(
         auto_stop = profile["auto_stop"]
         auto_stop_patience = profile["auto_stop_patience"]
         auto_stop_delta = profile["auto_stop_delta"]
-    sensor = FreenectV1Sensor()
+    sensor = FreenectV1Sensor(FreenectV1Config(depth_registration=depth_registration))
+    if depth_registration and not sensor.depth_registered:
+        console.print(f"[yellow]{REGISTRATION_FALLBACK_MESSAGE}[/yellow]")
     config = CaptureConfig(
         frames=frames,
         fps=fps,

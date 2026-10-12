@@ -4,6 +4,7 @@ import json
 import sys
 import threading
 import tkinter as tk
+import warnings
 from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
@@ -19,7 +20,12 @@ from kinect_forge.config import CaptureConfig, KinectIntrinsics, ReconstructionC
 from kinect_forge.measure import measure_mesh
 from kinect_forge.presets import capture_preset, reconstruction_preset
 from kinect_forge.reconstruct import reconstruct_mesh
-from kinect_forge.sensors.freenect_v1 import FreenectV1Sensor, probe_device, set_tilt_degs
+from kinect_forge.sensors.freenect_v1 import (
+    REGISTRATION_FALLBACK_MESSAGE,
+    FreenectV1Sensor,
+    probe_device,
+    set_tilt_degs,
+)
 from kinect_forge.turntable import get_turntable_preset
 from kinect_forge.viewer import render_mesh_thumbnail, view_dataset, view_mesh
 
@@ -98,6 +104,23 @@ class App:
             return
         self.log_text.insert(tk.END, message + "\n")
         self.log_text.see(tk.END)
+
+    def _reconstruct_logging_warnings(
+        self,
+        input_dir: Path,
+        output_path: Path,
+        config: ReconstructionConfig,
+        on_progress: Callable[[int, int], None],
+    ) -> None:
+        # reconstruct_mesh reports dataset problems as warnings; show them in the log.
+        # Log them even when reconstruction then fails; they often explain why.
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            try:
+                reconstruct_mesh(input_dir, output_path, config, progress_callback=on_progress)
+            finally:
+                for warning in caught:
+                    self._log(f"Warning: {warning.message}")
 
     _T = TypeVar("_T")
 
@@ -246,6 +269,8 @@ class App:
             except Exception as exc:  # pragma: no cover
                 self._log(f"[pipeline/capture] {exc}")
                 return
+            if not sensor.depth_registered:
+                self._log(f"[pipeline/capture] {REGISTRATION_FALLBACK_MESSAGE}")
 
             def prepare_capture_state() -> tuple[Path, CaptureConfig]:
                 preset_name = self._pipeline_capture_preset.get()
@@ -347,11 +372,8 @@ class App:
 
                 self.root.after(0, update_progress_ui)
 
-            reconstruct_mesh(
-                Path(capture_root),
-                output_path,
-                preset_cfg,
-                progress_callback=on_progress,
+            self._reconstruct_logging_warnings(
+                Path(capture_root), output_path, preset_cfg, on_progress
             )
 
             def mark_reconstruct_done() -> None:
@@ -445,6 +467,8 @@ class App:
                 self._log(f"Capture failed: {exc}")
                 self._log("Ensure freenect is installed in this Python environment.")
                 return
+            if not sensor.depth_registered:
+                self._log(REGISTRATION_FALLBACK_MESSAGE)
             if self.capture_profile.get():
                 try:
                     profile = capture_preset(self.capture_profile.get())
@@ -864,8 +888,8 @@ class App:
                 pct = int(100 * current / total) if total else 0
                 self.root.after(0, self._update_recon_progress, current, total, pct)
 
-            reconstruct_mesh(
-                Path(self.recon_input.get()), output_path, config, progress_callback=on_progress
+            self._reconstruct_logging_warnings(
+                Path(self.recon_input.get()), output_path, config, on_progress
             )
             self.root.after(0, self._update_thumbnail, str(output_path))
 

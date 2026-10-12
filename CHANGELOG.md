@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+### Added
+- Depth is captured aligned to the RGB image (libfreenect `DEPTH_REGISTERED`), so colour no longer sits ~25 mm off the geometry. `--no-depth-registration` turns it off; `metadata.json` records `depth_registered`, and `reconstruct` warns on datasets captured without it. The GUI log now shows reconstruct warnings (#3).
+
 ## 0.2.1 - 2026-10-12
 ### Fixed
 - `reconstruct` failed with "Reconstruction produced an empty mesh" on every fresh install, because pip resolved Open3D 0.20.0, whose legacy `ScalableTSDFVolume` integrates nothing. Fusion now uses Open3D's tensor `VoxelBlockGrid`, which works on 0.19 and 0.20 (0.20 is the first release with wheels for Python 3.13 and 3.14). A new test reconstructs a synthetic wall end to end so CI catches a regression like this.
