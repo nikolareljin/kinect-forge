@@ -652,6 +652,11 @@ class App:
         ttk.Entry(tilt_frame, textvariable=self.capture_tilt, width=6).pack(side=tk.LEFT, padx=4)
 
         def tilt_to(angle: float) -> None:
+            # Keep the field in step, so Up/Down move from the last requested angle
+            # instead of repeating the same step from the value typed in.
+            angle = max(-30.0, min(30.0, angle))
+            self.capture_tilt.set(angle)
+
             def work() -> None:
                 streaming = self._active_sensor
                 own: ProcessSensor | None = None
@@ -683,12 +688,12 @@ class App:
             side=tk.LEFT, padx=4
         )
         ttk.Button(
-            tilt_frame, text="Up", command=lambda: tilt_to(min(30.0, self.capture_tilt.get() + 5.0))
+            tilt_frame, text="Up", command=lambda: tilt_to(self.capture_tilt.get() + 5.0)
         ).pack(side=tk.LEFT)
         ttk.Button(
             tilt_frame,
             text="Down",
-            command=lambda: tilt_to(max(-30.0, self.capture_tilt.get() - 5.0)),
+            command=lambda: tilt_to(self.capture_tilt.get() - 5.0),
         ).pack(side=tk.LEFT, padx=4)
 
         sweep_frame = ttk.Frame(action_frame)

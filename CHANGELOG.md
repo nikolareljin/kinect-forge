@@ -7,6 +7,7 @@
 - `.gltf` export wrote its geometry to `gltf_buffer_N.bin` files beside it, so two exports into one folder overwrote each other. Buffers are now embedded and the `.gltf` is a single file.
 - Tilting while frames stream (tilt sweep, GUI tilt during live preview) failed with `LIBUSB_ERROR_BUSY`. Tilt now goes through libfreenect's sync API, which shares the open device.
 - The GUI tilt sweep checkbox did nothing: capture was never given a tilt callback.
+- The GUI tilt Up/Down buttons stepped from the value in the field without updating it, so pressing Up twice stayed at +5 degrees. The field now follows each request, clamped to -30..30.
 - `capture --capture-preset face-scan` ignored the preset's `tilt_sweep` settings.
 - `fill_hole_radius` had no effect; it now fills holes up to that radius with Open3D's tensor mesh `fill_holes`.
 - The mesh viewer drew every mesh flat blue and showed it lying on its back. It now shows vertex colours and opens looking from the sensor.
