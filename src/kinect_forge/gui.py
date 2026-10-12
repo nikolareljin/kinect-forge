@@ -113,11 +113,14 @@ class App:
         on_progress: Callable[[int, int], None],
     ) -> None:
         # reconstruct_mesh reports dataset problems as warnings; show them in the log.
+        # Log them even when reconstruction then fails; they often explain why.
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            reconstruct_mesh(input_dir, output_path, config, progress_callback=on_progress)
-        for warning in caught:
-            self._log(f"Warning: {warning.message}")
+            try:
+                reconstruct_mesh(input_dir, output_path, config, progress_callback=on_progress)
+            finally:
+                for warning in caught:
+                    self._log(f"Warning: {warning.message}")
 
     _T = TypeVar("_T")
 

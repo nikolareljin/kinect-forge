@@ -169,3 +169,27 @@ def test_gui_logs_reconstruct_warnings(monkeypatch, tmp_path):
     )
 
     assert logged == ["Warning: Dataset depth is not registered to colour"]
+
+
+def test_gui_logs_reconstruct_warnings_when_reconstruct_fails(monkeypatch, tmp_path):
+    import types
+    import warnings
+
+    import pytest
+
+    from kinect_forge import gui
+
+    def fake_reconstruct(*args, **kwargs):
+        warnings.warn("Dataset depth is not registered to colour", stacklevel=2)
+        raise RuntimeError("Reconstruction produced an empty mesh.")
+
+    monkeypatch.setattr(gui, "reconstruct_mesh", fake_reconstruct)
+    logged: list[str] = []
+    app = types.SimpleNamespace(_log=logged.append)
+
+    with pytest.raises(RuntimeError, match="empty mesh"):
+        gui.App._reconstruct_logging_warnings(
+            app, tmp_path, tmp_path / "m.ply", None, lambda c, t: None
+        )
+
+    assert logged == ["Warning: Dataset depth is not registered to colour"]
