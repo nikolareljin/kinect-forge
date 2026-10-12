@@ -123,3 +123,39 @@ def test_estimate_turntable_poses_inverts_the_icp_result(monkeypatch):
 
     for got, want in zip(estimated, poses, strict=True):
         assert np.allclose(got, want, atol=1e-9)
+
+
+def test_reconstruct_mesh_builds_a_surface_from_a_flat_wall(tmp_path):
+    """End to end through Open3D: a wall 1 m away must come out as a non-empty mesh.
+
+    Open3D 0.20.0 integrates nothing into ScalableTSDFVolume, so every
+    reconstruct fails with "empty mesh"; this test is what catches such a release.
+    """
+    import imageio.v3 as iio
+
+    from kinect_forge.config import KinectIntrinsics, ReconstructionConfig
+    from kinect_forge.dataset import DatasetMeta, ensure_dirs, write_metadata
+    from kinect_forge.reconstruct import reconstruct_mesh
+
+    dataset = tmp_path / "wall"
+    color_dir, depth_dir = ensure_dirs(dataset)
+    rng = np.random.default_rng(0)
+    color = rng.integers(0, 255, (480, 640, 3), dtype=np.uint8)
+    depth = np.full((480, 640), 1000, dtype=np.uint16)
+    for idx in range(3):
+        iio.imwrite(color_dir / f"color_{idx:06d}.png", color)
+        iio.imwrite(depth_dir / f"depth_{idx:06d}.png", depth)
+    write_metadata(
+        dataset,
+        DatasetMeta(
+            intrinsics=KinectIntrinsics(),
+            depth_scale=1000.0,
+            depth_trunc=3.0,
+        ),
+    )
+
+    output = tmp_path / "wall.ply"
+    reconstruct_mesh(dataset, output, ReconstructionConfig())
+
+    assert output.exists()
+    assert output.stat().st_size > 0

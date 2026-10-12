@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kinect-forge"
-version = "0.2.0"
+version = "0.2.1"
 description = "Kinect-based 3D scanning toolkit for Ubuntu"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,7 +15,10 @@ keywords = ["kinect", "3d", "scanner", "depth", "open3d"]
 # Core deps are intentionally minimal; sensor backends are optional extras.
 dependencies = [
   "numpy>=1.26",
-  "open3d>=0.18",
+  # 0.20.0 integrates nothing into ScalableTSDFVolume, so every reconstruct
+  # ends in "empty mesh". tests/test_reconstruct.py catches it; lift the cap
+  # when that test passes on a newer release.
+  "open3d>=0.18,<0.20",
   "opencv-python>=4.9",
   "imageio>=2.34",
   "trimesh>=4.4",

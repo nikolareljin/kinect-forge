@@ -44,5 +44,6 @@ def _bbox_extent(bbox: object) -> npt.NDArray[Any]:
     max_bound = getattr(bbox, "get_max_bound", None)
     min_bound = getattr(bbox, "get_min_bound", None)
     if callable(max_bound) and callable(min_bound):
-        return np.asarray(max_bound()) - np.asarray(min_bound())
+        extent_arr: npt.NDArray[Any] = np.asarray(max_bound()) - np.asarray(min_bound())
+        return extent_arr
     raise AttributeError("Bounding box does not expose an extent method or attribute.")
