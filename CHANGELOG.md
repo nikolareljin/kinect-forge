@@ -1,6 +1,25 @@
 # Changelog
 
-## Unreleased
+## 0.2.2 - 2026-10-12
+### Fixed
+- Installed copies could not load presets: `presets.json` lived in `config/` at the repository root and was not in the wheel, so `reconstruct` (default preset `small`) and every `--capture-preset` failed with "Preset config not found" outside a source checkout. It now ships inside the package (`src/kinect_forge/presets.json`), also in the PyInstaller bundle.
+- STL export failed with "Write STL failed: compute normals first" and left an empty file. Triangle normals are now computed on a copy before writing.
+- `.gltf` export wrote its geometry to `gltf_buffer_N.bin` files beside it, so two exports into one folder overwrote each other. Buffers are now embedded and the `.gltf` is a single file.
+- Tilting while frames stream (tilt sweep, GUI tilt during live preview) failed with `LIBUSB_ERROR_BUSY`. Tilt now goes through libfreenect's sync API, which shares the open device.
+- The GUI tilt sweep checkbox did nothing: capture was never given a tilt callback.
+- `capture --capture-preset face-scan` ignored the preset's `tilt_sweep` settings.
+- `fill_hole_radius` had no effect; it now fills holes up to that radius with Open3D's tensor mesh `fill_holes`.
+- The mesh viewer drew every mesh flat blue and showed it lying on its back. It now shows vertex colours and opens looking from the sensor.
+- `./install` built in the checkout as root and left a root-owned `build/` and `*.egg-info` that broke later builds. It now builds the wheel as the invoking user (as `$SUDO_USER` when run with `sudo`) and installs that file. Leftovers from an earlier install are reported with the `sudo rm -rf` command that clears them.
+- The GUI live preview showed no image, and GUI capture could hang: with Tk's main loop running in the same process, libfreenect delivered no frames. The GUI now runs the Kinect in a child process (`ProcessSensor`), streaming at the sensor's 30 fps; a stalled device ends in an error message after a timeout instead of a frozen window. GUI tilt goes through that process while it streams.
+- A failed device open crashed capture with `TypeError: cannot unpack non-iterable NoneType object`. It now raises a clear error, and opening retries up to three times, since libfreenect's first open sometimes fails ("Failed to fetch registration pad info").
+- Merging a `release/X.Y.Z` PR now also builds and publishes the release; the tag the workflow pushed did not trigger `package.yml`.
+
+### Changed
+- `capture --capture-preset` no longer overrides flags typed on the command line: the preset fills in only what was not given, so `--capture-preset face-scan --no-tilt-sweep` captures without the sweep.
+- When the Kinect reports no accelerometer data (Kinect for Windows or model 1473 without the audio firmware, where the motor does not move), `tilt` prints a warning and exits with code 1 instead of reporting success, and capture logs a warning once. See `docs/SETUP.md`.
+- Default minimum capture depth in the GUI is 0.3 m (was 0.1 m), matching the CLI; the `small-object` capture preset uses 0.4 m (was 0.2 m). The Kinect v1 returns no depth that close anyway.
+
 ### Added
 - Depth is captured aligned to the RGB image (libfreenect `DEPTH_REGISTERED`), so colour no longer sits ~25 mm off the geometry. `--no-depth-registration` turns it off; `metadata.json` records `depth_registered`, and `reconstruct` warns on datasets captured without it. The GUI log now shows reconstruct warnings (#3).
 

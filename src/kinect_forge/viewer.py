@@ -37,6 +37,20 @@ def _thumbnail_camera(
     return center, center + offset, up
 
 
+# Scans are in the Kinect camera frame: x right, y down, z away from the sensor.
+# Plotly puts +z up by default, which shows a face lying on its back. Look from
+# the sensor instead (eye on -z, -y up) so the first view matches what the camera saw.
+_SCENE_LAYOUT: dict[str, Any] = {
+    "aspectmode": "data",
+    "camera": {"up": {"x": 0, "y": -1, "z": 0}, "eye": {"x": 0, "y": 0, "z": -2}},
+}
+
+
+def _rgb_strings(colors: npt.NDArray[Any]) -> list[str]:
+    rgb = np.clip(colors * 255.0, 0, 255).astype(np.uint8)
+    return [f"rgb({r},{g},{b})" for r, g, b in rgb]
+
+
 def _open_figure(fig: go.Figure, title: str) -> Path:
     with tempfile.NamedTemporaryFile(
         prefix="kinect-forge-", suffix=".html", delete=False
@@ -60,14 +74,17 @@ def _sample_points(
     return points, colors
 
 
-def view_mesh(mesh_path: Path) -> Path:
-    mesh = o3d.io.read_triangle_mesh(mesh_path)
-    if mesh.is_empty():
-        raise RuntimeError("Mesh is empty or could not be read.")
+def _mesh_figure(mesh: o3d.geometry.TriangleMesh) -> go.Figure:
     vertices = np.asarray(mesh.vertices)
     triangles = np.asarray(mesh.triangles)
     if len(vertices) == 0 or len(triangles) == 0:
         raise RuntimeError("Mesh has no vertices or triangles.")
+
+    # Show the scanned colour when the mesh has it, so a colour/depth misalignment
+    # is visible; a flat fill hides it.
+    shading: dict[str, Any] = {"color": "#6d8cff"}
+    if mesh.has_vertex_colors():
+        shading = {"vertexcolor": _rgb_strings(np.asarray(mesh.vertex_colors))}
 
     fig = go.Figure(
         data=[
@@ -78,17 +95,21 @@ def view_mesh(mesh_path: Path) -> Path:
                 i=triangles[:, 0],
                 j=triangles[:, 1],
                 k=triangles[:, 2],
-                color="#6d8cff",
                 flatshading=False,
                 opacity=1.0,
+                **shading,
             )
         ]
     )
-    fig.update_layout(
-        scene={"aspectmode": "data"},
-        margin={"l": 0, "r": 0, "b": 0, "t": 40},
-    )
-    return _open_figure(fig, f"Kinect Forge Mesh: {mesh_path.name}")
+    fig.update_layout(scene=_SCENE_LAYOUT, margin={"l": 0, "r": 0, "b": 0, "t": 40})
+    return fig
+
+
+def view_mesh(mesh_path: Path) -> Path:
+    mesh = o3d.io.read_triangle_mesh(mesh_path)
+    if mesh.is_empty():
+        raise RuntimeError("Mesh is empty or could not be read.")
+    return _open_figure(_mesh_figure(mesh), f"Kinect Forge Mesh: {mesh_path.name}")
 
 
 def view_dataset(input_dir: Path, every: int = 10) -> Path:
@@ -138,8 +159,7 @@ def view_dataset(input_dir: Path, every: int = 10) -> Path:
 
     marker: dict[str, object] = {"size": 2, "opacity": 0.9}
     if colors is not None and len(colors) == len(points):
-        rgb = np.clip(colors * 255.0, 0, 255).astype(np.uint8)
-        marker["color"] = [f"rgb({r},{g},{b})" for r, g, b in rgb]
+        marker["color"] = _rgb_strings(colors)
     else:
         marker["color"] = points[:, 2]
         marker["colorscale"] = "Viridis"
@@ -155,10 +175,7 @@ def view_dataset(input_dir: Path, every: int = 10) -> Path:
             )
         ]
     )
-    fig.update_layout(
-        scene={"aspectmode": "data"},
-        margin={"l": 0, "r": 0, "b": 0, "t": 40},
-    )
+    fig.update_layout(scene=_SCENE_LAYOUT, margin={"l": 0, "r": 0, "b": 0, "t": 40})
     return _open_figure(fig, f"Kinect Forge Dataset: {input_dir.name}")
 
 

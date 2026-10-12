@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -13,11 +14,13 @@ from kinect_forge.measure import measure_mesh
 from kinect_forge.presets import capture_preset, reconstruction_preset
 from kinect_forge.reconstruct import reconstruct_mesh
 from kinect_forge.sensors.freenect_v1 import (
+    MOTOR_NOT_RESPONDING_MESSAGE,
     REGISTRATION_FALLBACK_MESSAGE,
     FreenectV1Config,
     FreenectV1Sensor,
     probe_device,
     set_tilt_degs,
+    stop_sync,
 )
 from kinect_forge.turntable import get_turntable_preset
 from kinect_forge.viewer import view_dataset, view_mesh
@@ -60,12 +63,19 @@ def tilt(
     """Set Kinect v1 tilt angle (up/down only)."""
     if angle < -30 or angle > 30:
         raise typer.BadParameter("angle must be between -30 and 30 degrees")
-    set_tilt_degs(angle, index=index)
+    try:
+        responding = set_tilt_degs(angle, index=index)
+    finally:
+        stop_sync()
+    if not responding:
+        console.print(f"[yellow]{MOTOR_NOT_RESPONDING_MESSAGE}[/yellow]")
+        raise typer.Exit(code=1)
     console.print(f"Tilt set to {angle} degrees.")
 
 
 @app.command()
 def capture(
+    ctx: typer.Context,
     output: pathlib.Path = typer.Option("captures", help="Output directory"),
     frames: int = typer.Option(300, help="Number of RGB-D frames to capture"),
     fps: float = typer.Option(30.0, help="Target capture FPS"),
@@ -109,14 +119,30 @@ def capture(
     """Capture RGB-D frames using Kinect v1 (libfreenect)."""
     if capture_preset_name:
         profile = capture_preset(capture_preset_name)
-        fps = profile["fps"]
-        frames = profile["frames"]
-        depth_min = profile["depth_min"]
-        depth_max = profile["depth_max"]
-        mask_background = profile["mask_background"]
-        auto_stop = profile["auto_stop"]
-        auto_stop_patience = profile["auto_stop_patience"]
-        auto_stop_delta = profile["auto_stop_delta"]
+
+        def pick(name: str, current: Any) -> Any:
+            # The preset fills in what the user did not type; a flag on the command
+            # line wins, so `--capture-preset face-scan --no-tilt-sweep` does not sweep.
+            # Compared by name: newer typer bundles its own click, so its
+            # ParameterSource is not click.core.ParameterSource.
+            source = ctx.get_parameter_source(name)
+            if name in profile and (source is None or source.name == "DEFAULT"):
+                return profile[name]
+            return current
+
+        fps = float(pick("fps", fps))
+        frames = int(pick("frames", frames))
+        depth_min = float(pick("depth_min", depth_min))
+        depth_max = float(pick("depth_max", depth_max))
+        mask_background = bool(pick("mask_background", mask_background))
+        auto_stop = bool(pick("auto_stop", auto_stop))
+        auto_stop_patience = int(pick("auto_stop_patience", auto_stop_patience))
+        auto_stop_delta = float(pick("auto_stop_delta", auto_stop_delta))
+        tilt_sweep = bool(pick("tilt_sweep", tilt_sweep))
+        tilt_min = float(pick("tilt_min", tilt_min))
+        tilt_max = float(pick("tilt_max", tilt_max))
+        tilt_step = float(pick("tilt_step", tilt_step))
+        tilt_hold_frames = int(pick("tilt_hold_frames", tilt_hold_frames))
     sensor = FreenectV1Sensor(FreenectV1Config(depth_registration=depth_registration))
     if depth_registration and not sensor.depth_registered:
         console.print(f"[yellow]{REGISTRATION_FALLBACK_MESSAGE}[/yellow]")
@@ -186,8 +212,13 @@ def capture(
         }
     )
 
+    motor_warned = False
+
     def tilt_cb(angle: float) -> None:
-        set_tilt_degs(angle)
+        nonlocal motor_warned
+        if not set_tilt_degs(angle) and not motor_warned:
+            console.print(f"[yellow]{MOTOR_NOT_RESPONDING_MESSAGE}[/yellow]")
+            motor_warned = True
 
     capture_frames(
         sensor, output, config, intrinsics=intrinsics, tilt_cb=tilt_cb if tilt_sweep else None

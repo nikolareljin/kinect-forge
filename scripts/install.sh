@@ -100,11 +100,44 @@ if [[ ! -d "$VENV_DIR" ]]; then
 fi
 
 sudo "$VENV_DIR/bin/python" -m pip install --upgrade pip
-if $DEV_EXTRAS; then
-  sudo "$VENV_DIR/bin/pip" install --upgrade "${ROOT_DIR}[dev]"
-else
-  sudo "$VENV_DIR/bin/pip" install --upgrade "$ROOT_DIR"
+
+# Build the wheel as the invoking user, then install that file as root. Running
+# `sudo pip install <checkout>` builds in the checkout and leaves a root-owned
+# build/ and *.egg-info there, which later non-root builds cannot overwrite.
+# Under `sudo ./install` that means building as $SUDO_USER, not root.
+BUILD_AS=()
+BUILD_USER="$(id -un)"
+if [[ $EUID -eq 0 && -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+  BUILD_AS=(sudo -u "$SUDO_USER")
+  BUILD_USER="$SUDO_USER"
 fi
+for leftover in "$ROOT_DIR/build" "$ROOT_DIR"/src/*.egg-info; do
+  if [[ -e "$leftover" ]] && ! "${BUILD_AS[@]}" test -w "$leftover"; then
+    log_error "$leftover is not writable by $BUILD_USER (left by an earlier root build)."
+    log_error "Remove it with: sudo rm -rf \"$leftover\""
+    exit 1
+  fi
+done
+WHEEL_DIR="$(mktemp -d)"
+trap 'rm -rf "$WHEEL_DIR"' EXIT
+if [[ ${#BUILD_AS[@]} -gt 0 ]]; then
+  chown "$SUDO_USER" "$WHEEL_DIR"
+fi
+"${BUILD_AS[@]}" "$VENV_DIR/bin/pip" wheel --no-deps --wheel-dir "$WHEEL_DIR" "$ROOT_DIR"
+WHEEL_FILES=("$WHEEL_DIR"/kinect_forge-*.whl)
+if [[ ! -f "${WHEEL_FILES[0]}" ]]; then
+  log_error "Wheel build produced no kinect_forge wheel in $WHEEL_DIR."
+  exit 1
+fi
+WHEEL="${WHEEL_FILES[0]}"
+WHEEL_SPEC="$WHEEL"
+if $DEV_EXTRAS; then
+  WHEEL_SPEC="${WHEEL}[dev]"
+fi
+# A wheel with an unchanged version number counts as already installed, so force
+# the package itself, then let pip resolve its dependencies as usual.
+sudo "$VENV_DIR/bin/pip" install --force-reinstall --no-deps "$WHEEL"
+sudo "$VENV_DIR/bin/pip" install --upgrade "$WHEEL_SPEC"
 
 if ! has_freenect_module "$VENV_DIR/bin/python"; then
   if ! install_freenect_bindings "$VENV_DIR/bin/python"; then
