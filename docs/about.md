@@ -50,4 +50,4 @@ prints it, or cuts it in vinyl, on an ELEGOO Neptune 4.
 |---|---|
 | [scancontext](https://nikolareljin.github.io/scancontext/) | Medical imaging review tool |
 | [orthodox-calendar](https://nikolareljin.github.io/orthodox-calendar/) | Saints, name-days, readings and ICS feeds for 17 Orthodox traditions |
-| [gutenberg-stocks](https://nikolareljin.github.io/gutenberg-stocks/) | WordPress Gutenberg block for stock time series |
+| [nr-stocks](https://nikolareljin.github.io/nr-stocks/) | Stock, forex, and crypto charts for the WordPress block editor (formerly gutenberg-stocks). |
